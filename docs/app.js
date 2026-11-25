@@ -201,6 +201,9 @@ $("#approvals").addEventListener("click", async e => {
   approvalsKey = ""; poll();
 });
 
+// Agent activity filter: null = show every agent, otherwise only that agent's entries.
+let logFilter = null;
+
 function drawLog(s) {
   const box = $("#log");
   for (const e of s.log) {
@@ -210,13 +213,45 @@ function drawLog(s) {
     const c = AGENT_COLOR[e.agent] || "var(--muted)";
     const div = document.createElement("div");
     div.className = "entry " + e.kind;
+    div.dataset.agent = e.agent;
+    div.hidden = !!logFilter && e.agent !== logFilter;   // new entries follow the active filter
     div.style.borderLeftColor = c;
-    div.innerHTML = `<div class="meta"><span class="tag" style="color:${c};border-color:${c}">${esc(e.agent)}</span>
+    div.innerHTML = `<div class="meta"><button class="tag filterable" data-agent="${esc(e.agent)}" style="color:${c};border-color:${c}"
+      title="Show only ${esc(e.agent)}">${esc(e.agent)}</button>
       <span>${esc(e.t.slice(-5))}</span>${e.model ? `<span class="model">${esc(e.model)}</span>` : ""}</div>${esc(e.text)}`;
     box.prepend(div);
   }
   while (box.children.length > 200) box.lastChild.remove();
+  updateLogEmpty();
 }
+
+function updateLogEmpty() {
+  const empty = $("#logEmpty");
+  const none = !!logFilter && ![...$("#log").children].some(d => !d.hidden);
+  empty.classList.toggle("hidden", !none);
+  if (none) empty.textContent = `No entries from ${logFilter} yet. New ones will show up here.`;
+}
+
+function setLogFilter(agent) {
+  logFilter = agent && agent !== logFilter ? agent : null;   // same tag again = back to all
+  for (const d of $("#log").children) d.hidden = !!logFilter && d.dataset.agent !== logFilter;
+  $("#log").scrollTop = 0;
+  renderLegend();
+  updateLogEmpty();
+}
+
+function renderLegend() {
+  const tags = Object.entries(AGENT_COLOR).filter(([n]) => !(REF && n === "GTM Agent"));
+  $("#agentLegend").classList.toggle("filtering", !!logFilter);
+  $("#agentLegend").innerHTML =
+    `<button class="tag filterable${logFilter ? "" : " active"}" data-agent="" style="color:var(--text);border-color:var(--muted)"
+      aria-pressed="${!logFilter}">All</button>` +
+    tags.map(([n, c]) => `<button class="tag filterable${logFilter === n ? " active" : ""}" data-agent="${esc(n)}"
+      style="color:${c};border-color:${c}" aria-pressed="${logFilter === n}">${esc(n)}</button>`).join("");
+}
+renderLegend();
+$("#agentLegend").addEventListener("click", e => { const t = e.target.closest(".tag"); if (t) setLogFilter(t.dataset.agent); });
+$("#log").addEventListener("click", e => { const t = e.target.closest(".tag"); if (t) setLogFilter(t.dataset.agent); });
 
 function drawFleet(s) {
   const rows = [...s.vehicles].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
@@ -253,9 +288,25 @@ function drawChart(s) {
   chart.update();
 }
 
-// ---------- GTM panel ----------
-const GTM_NEXT = { draft: ["approved", "Approve"], approved: ["sent", "Mark sent"], sent: ["replied", "Mark replied"] };
+// ---------- right column tabs ----------
+function showTab(name) {
+  if (REF) name = "ops";                      // prospects only ever see the operations view
+  $("#paneOps").classList.toggle("hidden", name !== "ops");
+  $("#paneGtm").classList.toggle("hidden", name !== "gtm");
+  document.querySelectorAll(".tab").forEach(t => {
+    const on = t.dataset.tab === name;
+    t.classList.toggle("on", on); t.setAttribute("aria-selected", on);
+  });
+  try { localStorage.setItem("fmTab", name); } catch { /* storage blocked: tab just isn't remembered */ }
+  if (name === "gtm") { gtmKey = ""; drawGtm(); }
+}
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => showTab(t.dataset.tab)));
+
+// ---------- GTM outreach tab ----------
+const GTM_LABEL = { draft: "draft", approved: "approved", sent: "sent", replied: "replied" };
 let gtmData = null, gtmOpen = null, gtmKey = "";
+
+function setGtmCount(n) { $("#gtmTabCount").textContent = n == null ? "" : `(${n})`; }
 
 function gmailUrl(r) {
   const d = r.draft;
@@ -263,40 +314,52 @@ function gmailUrl(r) {
     "&su=" + encodeURIComponent(d.subject) + "&body=" + encodeURIComponent(d.body);
 }
 
+function leadCard(r) {
+  const d = r.draft, sc = d ? d.score : null, open = gtmOpen === r.id;
+  const scc = sc == null ? "var(--muted)" : sc >= 8 ? "var(--ok)" : sc >= 6 ? "var(--warn)" : "var(--idle)";
+  const sentDone = r.status === "sent" || r.status === "replied";
+  let html = `<div class="lead${open ? " open" : ""}" data-id="${r.id}">
+    <div class="lead-top" data-act="toggle" title="Show or hide the email">
+      <span class="score" style="color:${scc};border-color:${scc}" title="Fit score">${sc ?? "…"}</span>
+      <span class="lname"><b>${esc(r.name)}</b><small>${esc(r.city)}${r.opens ? ` · 👀 ${r.opens} demo open${r.opens > 1 ? "s" : ""}` : ""}</small></span>
+      <span class="gst ${r.status}">${GTM_LABEL[r.status] || esc(r.status)}</span>
+    </div>
+    <div class="lead-actions">
+      <button class="lbtn${open ? " on" : ""}" data-act="toggle" ${d ? "" : "disabled"}>${open ? "Hide email" : "View email"}</button>
+      ${d ? `<a class="lbtn primary" data-act="gmail" href="${esc(gmailUrl(r))}" target="_blank" rel="noopener">Open in Gmail</a>`
+          : `<button class="lbtn primary" disabled>Open in Gmail</button>`}
+      <button class="lbtn" data-act="status" data-s="sent" ${sentDone ? "disabled" : ""}>Mark sent</button>
+      <button class="lbtn" data-act="status" data-s="replied" ${r.status === "replied" ? "disabled" : ""}>Mark replied</button>
+    </div>`;
+  if (open) {
+    html += !d ? `<p class="note">Draft not ready yet.</p>` : `
+      <p class="why">${esc(d.reason)} <small>(${esc(d.model)}${d.site_read ? ", website read" : ""})</small></p>
+      <div class="mail"><div><span>To</span> ${esc(r.email)}</div><div><span>Subject</span> ${esc(d.subject)}</div>
+        <pre>${esc(d.body)}</pre></div>
+      <div class="lead-actions">
+        <button class="lbtn" data-act="copy">Copy</button>
+        ${r.status === "draft" ? `<button class="lbtn" data-act="status" data-s="approved">Approve</button>` : ""}
+        ${r.status !== "draft" ? `<button class="lbtn" data-act="status" data-s="draft">Back to draft</button>` : ""}
+        <a class="lbtn" href="${esc(r.website)}" target="_blank" rel="noopener">Website</a>
+      </div>
+      ${r.last_open ? `<p class="note">Last demo open: ${esc(r.last_open.replace("T", " ").slice(0, 16))} UTC</p>` : ""}
+      <p class="note">Nothing is sent automatically. Send it yourself from Gmail, then mark it sent.</p>`;
+  }
+  return html + `</div>`;
+}
+
 function drawGtm() {
   if (!gtmData) return;
-  const rows = gtmData.leads, p = gtmData.progress;
-  $("#gtmCount").textContent = rows.length; $("#gtmCount").classList.toggle("zero", !rows.length);
-  $("#gtmProgress").textContent = p.running ? ` · researching ${p.done}/${p.todo}…` : "";
+  const rows = gtmData.leads, p = gtmData.progress, k = gtmData.kpi;
+  setGtmCount(rows.length);
+  $("#gtmProgress").textContent = p.running ? `· researching ${p.done}/${p.todo}…` : "";
+  const n = st => rows.filter(r => r.status === st).length;
+  $("#gtmSummary").textContent = `Draft ${n("draft")} · Approved ${n("approved")} · Sent ${n("sent")} · Replied ${n("replied")} · Demo opens ${k.opens}`;
   // only redraw when something changed, so an open card doesn't flicker while you read it
   const key = JSON.stringify([rows.map(r => [r.id, r.status, r.opens, r.draft?.score, r.draft?.generated]), gtmOpen]);
   if (key === gtmKey) return;
   gtmKey = key;
-  $("#gtmList").innerHTML = rows.map(r => {
-    const d = r.draft, sc = d ? d.score : null;
-    const scc = sc == null ? "var(--muted)" : sc >= 8 ? "var(--ok)" : sc >= 6 ? "var(--warn)" : "var(--idle)";
-    const head = `<div class="lead-row" data-id="${r.id}">
-      <span class="score" style="color:${scc};border-color:${scc}">${sc ?? "…"}</span>
-      <span class="lname"><b>${esc(r.name)}</b><small>${esc(r.city)}${r.opens ? ` · 👀 ${r.opens} demo open${r.opens > 1 ? "s" : ""}` : ""}</small></span>
-      <span class="gst ${r.status}">${r.status}</span></div>`;
-    if (gtmOpen !== r.id) return `<div class="lead">${head}</div>`;
-    if (!d) return `<div class="lead open">${head}<p class="empty">Draft not ready yet.</p></div>`;
-    const next = GTM_NEXT[r.status];
-    const mail = r.status === "draft" ? "" : `
-      <div class="mail-actions"><button class="gtm-copy">Copy</button>
-        <a class="gtm-gmail" href="${esc(gmailUrl(r))}" target="_blank" rel="noopener">Open in Gmail</a></div>`;
-    return `<div class="lead open">${head}
-      <p class="why">${esc(d.reason)} <small>(${esc(d.model)}${d.site_read ? ", website read" : ""})</small></p>
-      <div class="mail"><div><span>To</span> ${esc(r.email)}</div><div><span>Subject</span> ${esc(d.subject)}</div>
-        <pre>${esc(d.body)}</pre></div>
-      ${mail}
-      <div class="btns">${next ? `<button class="gtm-set" data-s="${next[0]}">${next[1]}</button>` : ""}
-        ${r.status !== "draft" ? `<button class="gtm-set back" data-s="draft">Back to draft</button>` : ""}
-        <a href="${esc(r.website)}" target="_blank" rel="noopener">Website</a></div>
-      ${r.last_open ? `<p class="why"><small>Last demo open: ${esc(r.last_open.replace("T", " ").slice(0, 16))} UTC</small></p>` : ""}
-      ${r.status === "draft" ? `<p class="why"><small>Nothing is sent automatically. Approve, then send it yourself from Gmail.</small></p>` : ""}
-    </div>`;
-  }).join("") || `<p class="empty">No leads in docs/leads.json.</p>`;
+  $("#gtmList").innerHTML = rows.map(leadCard).join("") || `<p class="empty">No leads in docs/leads.json.</p>`;
 }
 
 async function pollGtm() {
@@ -305,19 +368,22 @@ async function pollGtm() {
 }
 
 $("#gtmList").addEventListener("click", async e => {
-  const lead = e.target.closest(".lead"); if (!lead) return;
-  const id = lead.querySelector(".lead-row").dataset.id, r = gtmData.leads.find(x => x.id === id);
-  if (e.target.closest(".lead-row")) {
+  const card = e.target.closest(".lead"), el = e.target.closest("[data-act]");
+  if (!card || !el) return;
+  const id = card.dataset.id, r = gtmData.leads.find(x => x.id === id), act = el.dataset.act;
+  if (act === "toggle") {
+    if (!r.draft) return;
     gtmOpen = gtmOpen === id ? null : id; drawGtm();
-    const list = $("#gtmList"), card = list.querySelector(".lead.open");
-    if (card) list.scrollTop = card.offsetTop;   // show the opened card from its top (list is position: relative)
-    return;
-  }
-  if (e.target.classList.contains("gtm-set")) {
-    e.target.disabled = true;
-    await api(`/api/gtm/${id}/status`, { status: e.target.dataset.s });
+    const list = $("#gtmList"), open = list.querySelector(".lead.open");
+    if (open) list.scrollTop = open.offsetTop;   // show the opened card from its top (list is position: relative)
+  } else if (act === "status") {
+    el.disabled = true;
+    await api(`/api/gtm/${id}/status`, { status: el.dataset.s });
     await pollGtm(); poll();
-  } else if (e.target.classList.contains("gtm-copy")) {
+  } else if (act === "gmail") {
+    // the link opens Gmail by itself; opening the compose window counts as approving the draft
+    if (r.status === "draft") api(`/api/gtm/${id}/status`, { status: "approved" }).then(pollGtm).then(poll).catch(() => {});
+  } else if (act === "copy") {
     const text = `To: ${r.email}\nSubject: ${r.draft.subject}\n\n${r.draft.body}`;
     let ok = true;
     try { await navigator.clipboard.writeText(text); }
@@ -325,21 +391,22 @@ $("#gtmList").addEventListener("click", async e => {
       const ta = Object.assign(document.createElement("textarea"), { value: text });
       document.body.append(ta); ta.select(); ok = document.execCommand("copy"); ta.remove();
     }
-    e.target.textContent = ok ? "Copied ✓" : "Copy failed"; setTimeout(() => { e.target.textContent = "Copy"; }, 1500);
+    el.textContent = ok ? "Copied ✓" : "Copy failed"; setTimeout(() => { el.textContent = "Copy"; }, 1500);
   }
 });
 
 if (REF) {
-  $("#gtmPanel").classList.add("hidden");
-  document.querySelector(".bottom").classList.add("no-gtm");
+  $("#tabs").classList.add("hidden");
+  $("#paneGtm").classList.add("hidden");
   if (!sessionStorage.getItem("fmRef")) {   // one open per browser tab session; the backend also de-dupes
     sessionStorage.setItem("fmRef", REF);
     api("/api/gtm/open", { ref: REF }).catch(() => {});
   }
-} else { pollGtm(); setInterval(pollGtm, 4000); }
-
-$("#agentLegend").innerHTML = Object.entries(AGENT_COLOR).filter(([n]) => !(REF && n === "GTM Agent")).map(([n, c]) =>
-  `<span class="tag" style="color:${c};border-color:${c}">${n}</span>`).join("");
+} else {
+  pollGtm(); setInterval(pollGtm, 4000);
+  let saved = null; try { saved = localStorage.getItem("fmTab"); } catch { /* ignore */ }
+  showTab(saved === "gtm" ? "gtm" : "ops");
+}
 
 // ---------- loop ----------
 let failures = 0;
@@ -348,6 +415,7 @@ async function poll() {
     const s = await api(`/api/state?since=${lastLog}`);
     failures = 0; $("#offline").classList.add("hidden");
     lastState = s;
+    if (s.gtm_kpi && !REF) setGtmCount(s.gtm_kpi.leads);
     drawHeader(s); drawMap(s); drawKpis(s); drawApprovals(s); drawLog(s); drawFleet(s); drawChart(s);
   } catch (e) {
     if (++failures > 2) { $("#apiUrl").textContent = API || location.origin; $("#offline").classList.remove("hidden"); }

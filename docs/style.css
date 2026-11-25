@@ -33,7 +33,7 @@ main { display: grid; grid-template-columns: 1fr 410px; height: calc(100vh - 57p
 .kpi b { display: block; font-size: 18px; font-family: 'JetBrains Mono', monospace; }
 .kpi span { color: var(--muted); font-size: 11px; }
 
-aside { display: flex; flex-direction: column; gap: 10px; padding: 10px; border-left: 1px solid var(--line); overflow: auto; }
+aside { display: flex; flex-direction: column; gap: 10px; padding: 10px; border-left: 1px solid var(--line); overflow: hidden; min-height: 0; min-width: 0; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
 .panel.grow { flex: 1; display: flex; flex-direction: column; min-height: 240px; }
 .events { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -68,7 +68,7 @@ aside { display: flex; flex-direction: column; gap: 10px; padding: 10px; border-
 .entry.llm { background: rgba(124,92,255,.09); }
 @keyframes fade { from { opacity: 0; transform: translateY(-4px); } }
 
-.bottom { display: grid; grid-template-columns: 1fr 1.4fr 1.1fr; gap: 10px; padding: 10px; height: 300px; border-top: 1px solid var(--line); }
+.bottom { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; padding: 10px; height: 250px; border-top: 1px solid var(--line); }
 .bottom .panel { min-height: 0; display: flex; flex-direction: column; }
 .chart canvas { flex: 1; min-height: 0; }
 .tablewrap { overflow: auto; flex: 1; }
@@ -102,7 +102,7 @@ tr { cursor: pointer; } tr:hover td { background: var(--panel2); }
 #chatForm { display: flex; gap: 6px; padding: 10px; border-top: 1px solid var(--line); }
 #chatForm input { flex: 1; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px; color: var(--text); }
 #chatForm button { background: var(--accent); border: 0; border-radius: 8px; padding: 0 14px; color: #04121f; font-weight: 600; }
-.hidden { display: none !important; }
+[hidden], .hidden { display: none !important; }
 #offline { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); z-index: 2000; background: #3b1219; border: 1px solid var(--bad);
   padding: 12px 16px; border-radius: 10px; text-align: center; }
 
@@ -110,28 +110,55 @@ tr { cursor: pointer; } tr:hover td { background: var(--panel2); }
   main { grid-template-columns: 1fr; height: auto; }
   .mapwrap { height: 520px; }
   .kpis { grid-auto-flow: row; grid-template-columns: repeat(5, 1fr); }
+  aside { overflow: visible; }
+  .tabpane { overflow: visible; }
+  .gtmwrap { max-height: 560px; }
   .bottom { grid-template-columns: 1fr; height: auto; }
-  .chart { height: 260px; } .fleet { height: 320px; } .gtm { height: 420px; }
+  .chart { height: 260px; } .fleet { height: 320px; }
 }
 .pop-sep { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
-@media (min-width: 1101px) { .bottom.no-gtm { grid-template-columns: 1fr 1.4fr; } }
 .kpi span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
-.gtm h2 small { color: var(--muted); font-weight: 400; font-size: 11px; }
-.gtmwrap { position: relative; overflow: auto; flex: 1; display: flex; flex-direction: column; gap: 4px; }
-.lead { background: var(--panel2); border-radius: 8px; }
-.lead.open { border: 1px solid var(--line); padding-bottom: 8px; }
-.lead-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; cursor: pointer; }
-.lead-row:hover { background: rgba(255,255,255,.03); }
-.score { min-width: 24px; text-align: center; border: 1px solid; border-radius: 6px; font: 600 12px 'JetBrains Mono', monospace; padding: 1px 4px; }
+
+/* ---------- right column: tabs ---------- */
+.tabs { display: flex; gap: 4px; flex: none; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
+.tab { flex: 1; min-width: 0; background: transparent; border: 0; color: var(--muted); border-radius: 8px; padding: 7px 8px;
+  font-weight: 600; font-size: 12px; white-space: nowrap; }
+.tab:hover { color: var(--text); }
+.tab.on { background: var(--panel2); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent); }
+.tabpane { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 10px; }
+
+/* ---------- agent filter tags ---------- */
+.tag.filterable { background: transparent; font-family: inherit; cursor: pointer; line-height: 1.4; }
+.tag.filterable:hover { background: color-mix(in srgb, currentColor 14%, transparent); }
+.tag.active { background: color-mix(in srgb, currentColor 26%, transparent); box-shadow: 0 0 0 1px currentColor; }
+.agents.filtering .tag.filterable:not(.active) { opacity: .45; }
+#logEmpty { padding: 6px 2px; }
+
+/* ---------- GTM outreach tab ---------- */
+#gtmPanel { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+#gtmPanel h2 small { color: var(--muted); font-weight: 400; font-size: 11px; text-transform: none; letter-spacing: 0; }
+.gtm-sum { margin: -4px 0 8px; color: var(--muted); font-size: 11px; }
+.gtmwrap { position: relative; overflow-y: auto; overflow-x: hidden; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding-right: 2px; }
+.lead { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; display: flex; flex-direction: column; gap: 8px; flex: none; }
+.lead.open { border-color: var(--accent); }
+.lead-top { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.score { min-width: 26px; text-align: center; border: 1px solid; border-radius: 6px; font: 600 12px 'JetBrains Mono', monospace; padding: 2px 4px; }
 .lname { flex: 1; min-width: 0; font-size: 12px; }
-.lname small { display: block; color: var(--muted); font-size: 11px; }
-.gst { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; padding: 2px 6px; border-radius: 5px; background: var(--panel); color: var(--muted); }
-.gst.approved { color: var(--accent); } .gst.sent { color: var(--warn); } .gst.replied { color: var(--ok); }
-.lead .why { margin: 4px 10px; font-size: 12px; color: var(--text); } .lead .why small { color: var(--muted); }
-.mail { margin: 6px 10px; font-size: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+.lname b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lname small { display: block; color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gst { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; padding: 2px 7px; border-radius: 999px; background: var(--panel); color: var(--muted); border: 1px solid var(--line); }
+.gst.approved { color: var(--accent); border-color: var(--accent); }
+.gst.sent { color: var(--warn); border-color: var(--warn); }
+.gst.replied { color: var(--ok); border-color: var(--ok); }
+.lead-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+.lbtn { font-size: 11px; line-height: 1.2; padding: 5px 6px; border-radius: 7px; background: var(--panel); border: 1px solid var(--line);
+  color: var(--text); text-decoration: none; white-space: nowrap; }
+.lbtn:hover:not(:disabled) { border-color: var(--accent); }
+.lbtn:disabled { opacity: .4; cursor: default; }
+.lbtn.primary { background: var(--accent); border-color: var(--accent); color: #04121f; font-weight: 600; }
+.lbtn.on { border-color: var(--accent); color: var(--accent); }
+.lead .why { margin: 0; font-size: 12px; } .lead .why small { color: var(--muted); }
+.mail { font-size: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px; overflow-wrap: anywhere; }
 .mail span { color: var(--muted); display: inline-block; width: 52px; }
-.mail pre { white-space: pre-wrap; font: 12px/1.45 Inter, sans-serif; margin: 6px 0 0; max-height: 220px; overflow: auto; }
-.mail-actions, .lead .btns { display: flex; gap: 6px; align-items: center; margin: 6px 10px 0; flex-wrap: wrap; }
-.mail-actions button, .mail-actions a, .lead .btns button, .lead .btns a { font-size: 12px; padding: 5px 10px; border-radius: 7px;
-  background: var(--panel); border: 1px solid var(--line); color: var(--text); text-decoration: none; cursor: pointer; }
-.gtm-gmail, .gtm-set:not(.back) { background: var(--accent) !important; color: #04121f !important; border: 0 !important; font-weight: 600; }
+.mail pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.45 Inter, sans-serif; margin: 6px 0 0; max-height: 240px; overflow: auto; }
+.lead .note { margin: 0; color: var(--muted); font-size: 11px; }
