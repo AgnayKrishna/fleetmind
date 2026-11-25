@@ -1,0 +1,21 @@
+{
+  "generated": "2026-11-25",
+  "note": "Latvian freight / logistics companies with small or mid fleets. Only public company mailboxes (info@ / sales@) from each company's own website; no personal addresses.",
+  "leads": [
+    {"id": "bvgrupa", "name": "BV Grupa", "city": "Riga", "website": "https://bvgrupa.lv/", "email": "info@bvgrupa.lv", "source_url": "https://bvgrupa.lv/", "focus": "FTL/LTL road freight with a customs warehouse in Riga"},
+    {"id": "pelagus", "name": "Pelagus", "city": "Riga", "website": "https://www.pelagus.lv/", "email": "info@pelagus.lv", "source_url": "https://www.pelagus.lv/", "focus": "Freight forwarding, FTL/LTL road freight and customs clearance"},
+    {"id": "rixfreight", "name": "RIX Freight", "city": "Marupe", "website": "https://rixfreight-group.com/lv/", "email": "info@rixfreight-group.com", "source_url": "https://rixfreight-group.com/lv/", "focus": "International road freight, warehousing and customs"},
+    {"id": "totaltransport", "name": "Total Transport", "city": "Tiraine (Marupe)", "website": "https://totaltransport.lv/en/", "email": "info@totaltransport.lv", "source_url": "https://totaltransport.lv/en/", "focus": "Own-fleet road transport, cabotage and express deliveries"},
+    {"id": "kravasauto", "name": "Kravas Auto", "city": "Riga", "website": "https://kravasauto.lv/", "email": "info@kravasauto.lv", "source_url": "https://kravasauto.lv/lv/kontakti/", "focus": "Road freight in Latvia, Estonia and Lithuania"},
+    {"id": "aimer", "name": "Aimer", "city": "Riga", "website": "https://aimer.lv/", "email": "info@aimer.lv", "source_url": "https://aimer.lv/", "focus": "Full, groupage and oversize loads, plus rail transport"},
+    {"id": "scanfreight", "name": "Scanfreight Latvia", "city": "Liepaja", "website": "https://www.scanfreight.lv/", "email": "info@scanfreight.lv", "source_url": "https://www.scanfreight.lv/", "focus": "Road freight to and from Scandinavia"},
+    {"id": "ritlogistika", "name": "RITLOGISTIKA", "city": "Riga", "website": "https://ritlogistika.lv/", "email": "info@ritlogistika.lv", "source_url": "https://ritlogistika.lv/kontakti/", "focus": "Domestic and international freight incl. temperature-controlled loads"},
+    {"id": "cargoriga", "name": "Cargoriga", "city": "Riga", "website": "https://cargoriga.lv/", "email": "info@cargoriga.lv", "source_url": "https://cargoriga.lv/", "focus": "Freight transport, refrigerated haulage, removals and vehicle transport"},
+    {"id": "laskana", "name": "Laskana", "city": "Liepaja", "website": "https://laskana.lv/", "email": "info@laskana.lv", "source_url": "https://laskana.lv/kontakti/", "focus": "Timber and bulk cargo transport from the Port of Liepaja"},
+    {"id": "maho", "name": "Maho", "city": "Riga", "website": "https://www.maho.lv/", "email": "info@maho.lv", "source_url": "https://www.maho.lv/kontakti/", "focus": "Logistics company: full and groupage road transport"},
+    {"id": "imola", "name": "Imola", "city": "Salaspils", "website": "https://www.imola.lv/", "email": "info@imola.lv", "source_url": "https://www.imola.lv/kontakti/", "focus": "Own fleet, oversize and heavy cargo transport"},
+    {"id": "astgrupa", "name": "AST Grupa", "city": "Riga", "website": "https://www.astgrupa.eu/", "email": "info@astgrupa.eu", "source_url": "https://www.astgrupa.eu/", "focus": "International road freight with own Scania fleet and Frigo trailers"},
+    {"id": "posthaul", "name": "Posthaul", "city": "Riga", "website": "https://posthaul.com/", "email": "info@posthaul.com", "source_url": "https://posthaul.com/kontakti", "focus": "International freight in Europe, Scandinavia and the Baltics"},
+    {"id": "hrx", "name": "HRX Latvia", "city": "Kekava", "website": "https://www.hrx.lv/en/", "email": "info@hrx.lv", "source_url": "https://www.hrx.lv/en/kontakti/", "focus": "International and local freight, domestic trucking"}
+  ]
+}
