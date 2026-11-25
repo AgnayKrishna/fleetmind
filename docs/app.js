@@ -28,8 +28,23 @@ async function api(path, body) {
 
 // ---------- map ----------
 const map = L.map("map", { zoomControl: true }).setView([56.95, 24.3], 8);
-L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-  attribution: "&copy; OpenStreetMap contributors &copy; CARTO", maxZoom: 18 }).addTo(map);
+// Vector basemap from OpenFreeMap (free, no API key), drawn by MapLibre GL inside
+// Leaflet's tile pane, so routes and markers stay on top of it.
+const MAP_STYLE = "https://tiles.openfreemap.org/styles/dark";
+const MAP_STYLE_FALLBACK = "https://tiles.openfreemap.org/styles/fiord";
+const basemap = L.maplibreGL({ style: MAP_STYLE,
+  attribution: '<a href="https://openfreemap.org">OpenFreeMap</a> &copy; OpenStreetMap contributors' }).addTo(map);
+{
+  const gl = basemap.getMaplibreMap();
+  let styleLoaded = false, fellBack = false;
+  gl.once("style.load", () => { styleLoaded = true; });
+  gl.on("error", () => {   // the dark style could not be loaded: switch to fiord once
+    if (styleLoaded || fellBack) return;
+    fellBack = true;
+    gl.once("style.load", () => { styleLoaded = true; });
+    gl.setStyle(MAP_STYLE_FALLBACK);
+  });
+}
 const markers = {}, routes = {}, jobMarkers = {}, zoneLayers = {};
 let selected = null, lastState = null, lastLog = 0, approvalsKey = "";
 
