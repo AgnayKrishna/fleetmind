@@ -24,6 +24,7 @@ AGENTS = {
     "Dispatch Agent": "Matches jobs to vehicles: capacity, driver hours (EU 561/2006), time windows, EV range.",
     "Maintenance Agent": "Vehicle health, service intervals, breakdown diagnosis and repair planning.",
     "Fuel & Cost Agent": "Fuel and charging, cost per km, CO2, consumption anomalies.",
+    "GTM Agent": "Finds and scores pilot customers, drafts outreach emails for manager approval (never sends).",
 }
 
 FAULTS_DIESEL = [("Engine overheating", 120, 450), ("Flat tyre", 45, 120), ("AdBlue system fault", 90, 300),

@@ -9,7 +9,11 @@ const STATUS_TEXT = { to_pickup: "to pickup", to_dropoff: "delivering", to_depot
   loading: "loading", unloading: "unloading", idle: "idle", break: "driver break", refuel: "refuel/charge",
   broken: "BROKEN", service: "in service" };
 const AGENT_COLOR = { "Orchestrator": "var(--orch)", "Route Agent": "var(--route)", "Dispatch Agent": "var(--disp)",
-  "Maintenance Agent": "var(--maint)", "Fuel & Cost Agent": "var(--fuel)", "Fleet manager": "var(--mgr)" };
+  "Maintenance Agent": "var(--maint)", "Fuel & Cost Agent": "var(--fuel)", "GTM Agent": "var(--gtm)",
+  "Fleet manager": "var(--mgr)" };
+// A prospect opening the demo from an outreach email (?ref=<lead id>) gets the plain fleet demo:
+// no GTM panel, tile or log lines, so they never see the lead list or other companies' activity.
+const REF = (params.get("ref") || "").trim().toLowerCase();
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v.slice(4, -1)).trim() || v;
 const short = id => id.replace("LV-", "");
 const $ = s => document.querySelector(s);
@@ -165,6 +169,8 @@ function drawKpis(s) {
     ["€" + Math.round(k.fuel_cost + k.energy_cost).toLocaleString(), "fuel + charging"],
     ["€" + k.cost_per_km.toFixed(2), "energy cost / km"], [Math.round(k.co2_kg).toLocaleString(), "kg CO₂"],
     [k.auto_decisions + " / " + k.approvals_done, "auto / approved"]];
+  const g = s.gtm_kpi;
+  if (g && !REF) items.push([`${g.leads}/${g.sent}/${g.replies}/${g.opens}`, "leads / sent / replies / demo opens"]);
   $("#kpis").innerHTML = items.map(([b, t]) => `<div class="kpi"><b>${b}</b><span>${t}</span></div>`).join("");
 }
 
@@ -200,6 +206,7 @@ function drawLog(s) {
   for (const e of s.log) {
     if (e.id <= lastLog) continue;
     lastLog = e.id;
+    if (REF && e.agent === "GTM Agent") continue;
     const c = AGENT_COLOR[e.agent] || "var(--muted)";
     const div = document.createElement("div");
     div.className = "entry " + e.kind;
@@ -246,7 +253,92 @@ function drawChart(s) {
   chart.update();
 }
 
-$("#agentLegend").innerHTML = Object.entries(AGENT_COLOR).map(([n, c]) =>
+// ---------- GTM panel ----------
+const GTM_NEXT = { draft: ["approved", "Approve"], approved: ["sent", "Mark sent"], sent: ["replied", "Mark replied"] };
+let gtmData = null, gtmOpen = null, gtmKey = "";
+
+function gmailUrl(r) {
+  const d = r.draft;
+  return "https://mail.google.com/mail/?view=cm&to=" + encodeURIComponent(r.email) +
+    "&su=" + encodeURIComponent(d.subject) + "&body=" + encodeURIComponent(d.body);
+}
+
+function drawGtm() {
+  if (!gtmData) return;
+  const rows = gtmData.leads, p = gtmData.progress;
+  $("#gtmCount").textContent = rows.length; $("#gtmCount").classList.toggle("zero", !rows.length);
+  $("#gtmProgress").textContent = p.running ? ` · researching ${p.done}/${p.todo}…` : "";
+  // only redraw when something changed, so an open card doesn't flicker while you read it
+  const key = JSON.stringify([rows.map(r => [r.id, r.status, r.opens, r.draft?.score, r.draft?.generated]), gtmOpen]);
+  if (key === gtmKey) return;
+  gtmKey = key;
+  $("#gtmList").innerHTML = rows.map(r => {
+    const d = r.draft, sc = d ? d.score : null;
+    const scc = sc == null ? "var(--muted)" : sc >= 8 ? "var(--ok)" : sc >= 6 ? "var(--warn)" : "var(--idle)";
+    const head = `<div class="lead-row" data-id="${r.id}">
+      <span class="score" style="color:${scc};border-color:${scc}">${sc ?? "…"}</span>
+      <span class="lname"><b>${esc(r.name)}</b><small>${esc(r.city)}${r.opens ? ` · 👀 ${r.opens} demo open${r.opens > 1 ? "s" : ""}` : ""}</small></span>
+      <span class="gst ${r.status}">${r.status}</span></div>`;
+    if (gtmOpen !== r.id) return `<div class="lead">${head}</div>`;
+    if (!d) return `<div class="lead open">${head}<p class="empty">Draft not ready yet.</p></div>`;
+    const next = GTM_NEXT[r.status];
+    const mail = r.status === "draft" ? "" : `
+      <div class="mail-actions"><button class="gtm-copy">Copy</button>
+        <a class="gtm-gmail" href="${esc(gmailUrl(r))}" target="_blank" rel="noopener">Open in Gmail</a></div>`;
+    return `<div class="lead open">${head}
+      <p class="why">${esc(d.reason)} <small>(${esc(d.model)}${d.site_read ? ", website read" : ""})</small></p>
+      <div class="mail"><div><span>To</span> ${esc(r.email)}</div><div><span>Subject</span> ${esc(d.subject)}</div>
+        <pre>${esc(d.body)}</pre></div>
+      ${mail}
+      <div class="btns">${next ? `<button class="gtm-set" data-s="${next[0]}">${next[1]}</button>` : ""}
+        ${r.status !== "draft" ? `<button class="gtm-set back" data-s="draft">Back to draft</button>` : ""}
+        <a href="${esc(r.website)}" target="_blank" rel="noopener">Website</a></div>
+      ${r.last_open ? `<p class="why"><small>Last demo open: ${esc(r.last_open.replace("T", " ").slice(0, 16))} UTC</small></p>` : ""}
+      ${r.status === "draft" ? `<p class="why"><small>Nothing is sent automatically. Approve, then send it yourself from Gmail.</small></p>` : ""}
+    </div>`;
+  }).join("") || `<p class="empty">No leads in docs/leads.json.</p>`;
+}
+
+async function pollGtm() {
+  if (REF) return;
+  try { gtmData = await api("/api/gtm"); drawGtm(); } catch { /* the main poll shows the offline banner */ }
+}
+
+$("#gtmList").addEventListener("click", async e => {
+  const lead = e.target.closest(".lead"); if (!lead) return;
+  const id = lead.querySelector(".lead-row").dataset.id, r = gtmData.leads.find(x => x.id === id);
+  if (e.target.closest(".lead-row")) {
+    gtmOpen = gtmOpen === id ? null : id; drawGtm();
+    const list = $("#gtmList"), card = list.querySelector(".lead.open");
+    if (card) list.scrollTop = card.offsetTop;   // show the opened card from its top (list is position: relative)
+    return;
+  }
+  if (e.target.classList.contains("gtm-set")) {
+    e.target.disabled = true;
+    await api(`/api/gtm/${id}/status`, { status: e.target.dataset.s });
+    await pollGtm(); poll();
+  } else if (e.target.classList.contains("gtm-copy")) {
+    const text = `To: ${r.email}\nSubject: ${r.draft.subject}\n\n${r.draft.body}`;
+    let ok = true;
+    try { await navigator.clipboard.writeText(text); }
+    catch {   // older browsers / blocked clipboard API: copy through a hidden textarea
+      const ta = Object.assign(document.createElement("textarea"), { value: text });
+      document.body.append(ta); ta.select(); ok = document.execCommand("copy"); ta.remove();
+    }
+    e.target.textContent = ok ? "Copied ✓" : "Copy failed"; setTimeout(() => { e.target.textContent = "Copy"; }, 1500);
+  }
+});
+
+if (REF) {
+  $("#gtmPanel").classList.add("hidden");
+  document.querySelector(".bottom").classList.add("no-gtm");
+  if (!sessionStorage.getItem("fmRef")) {   // one open per browser tab session; the backend also de-dupes
+    sessionStorage.setItem("fmRef", REF);
+    api("/api/gtm/open", { ref: REF }).catch(() => {});
+  }
+} else { pollGtm(); setInterval(pollGtm, 4000); }
+
+$("#agentLegend").innerHTML = Object.entries(AGENT_COLOR).filter(([n]) => !(REF && n === "GTM Agent")).map(([n, c]) =>
   `<span class="tag" style="color:${c};border-color:${c}">${n}</span>`).join("");
 
 // ---------- loop ----------

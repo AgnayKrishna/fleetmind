@@ -12,14 +12,17 @@ from pydantic import BaseModel
 
 from . import llm
 from .agents import AGENTS, AgentTeam
+from .gtm import GtmAgent
 from .sim import World
 
 llm.init()
 world = World(seed=int(os.getenv("SEED", "7")))
 team = AgentTeam(world)
+gtm = GtmAgent(world)
 threading.Thread(target=world.run_forever, daemon=True).start()
 world.add_log("Orchestrator", f"FleetMind online with {len(world.vehicles)} vehicles. Agent mode: "
               f"{'Claude (subscription via Claude Code)' if llm.enabled() else 'rules engine'}.")
+gtm.start()   # drafts only leads that have no saved draft yet
 
 app = FastAPI(title="FleetMind")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -31,7 +34,9 @@ DEMO_KEY = os.getenv("DEMO_KEY", "").strip()
 
 @app.middleware("http")
 async def require_key(request: Request, call_next):
-    if DEMO_KEY and request.method == "POST" and request.url.path.startswith("/api/"):
+    # /api/gtm/open stays open: prospects arriving from an email link don't have the key.
+    if (DEMO_KEY and request.method == "POST" and request.url.path.startswith("/api/")
+            and request.url.path != "/api/gtm/open"):
         given = request.headers.get("x-demo-key") or request.query_params.get("key")
         if given != DEMO_KEY:
             return JSONResponse({"ok": False, "error": "wrong or missing demo key"}, status_code=401)
@@ -69,7 +74,31 @@ def state(since: int = 0):
     s["agents"] = llm.status()
     s["agent_roles"] = AGENTS
     s["key_required"] = bool(DEMO_KEY)
+    s["gtm_kpi"] = gtm.kpi()
     return s
+
+
+class GtmStatusIn(BaseModel):
+    status: str            # draft | approved | sent | replied
+
+
+class GtmOpenIn(BaseModel):
+    ref: str
+
+
+@app.get("/api/gtm")
+def gtm_state():
+    return gtm.snapshot()
+
+
+@app.post("/api/gtm/open")
+def gtm_open(o: GtmOpenIn):
+    return gtm.demo_opened(o.ref[:64])
+
+
+@app.post("/api/gtm/{lead_id}/status")
+def gtm_status(lead_id: str, s: GtmStatusIn):
+    return gtm.set_status(lead_id, s.status)
 
 
 @app.post("/api/event")

@@ -1,0 +1,152 @@
+{
+  "bvgrupa": {
+    "score": 4,
+    "reason": "Fits: partly forwarding/customs work.",
+    "subject": "Free 2-week AI dispatch pilot for BV Grupa",
+    "body": "Hello BV Grupa team,\n\nI came across BV Grupa while looking at freight companies in Riga. You focus on fTL/LTL road freight with a customs warehouse in Riga, and that is exactly the kind of daily dispatching FleetMind is built for.\n\nFleetMind is a team of AI agents that plans routes, reassigns jobs when traffic, weather or a breakdown hits, keeps drivers within EU hours and tracks fuel cost and CO2. I'd like to offer you a free 2-week pilot on your own routes, with no commitment.\n\nYou can try the live demo here: https://agnaykrishna.github.io/fleetmind/?ref=bvgrupa\n\nBest regards,\nAgnay Krishna Biju\nbagnaykrishna@gmail.com\n\nNot interested? Just reply \"no thanks\" and I won't contact you again.",
+    "source": "rules",
+    "model": "rules engine",
+    "site_read": true,
+    "generated": "2026-11-25T13:52:53+00:00"
+  },
+  "pelagus": {
+    "score": 7,
+    "reason": "Fits: temperature-controlled loads where ETAs matter, specialised heavy or timber cargo, international routes, partly forwarding/customs work.",
+    "subject": "Free 2-week AI dispatch pilot for Pelagus",
+    "body": "Hello Pelagus team,\n\nI came across Pelagus while looking at freight companies in Riga. You focus on freight forwarding, FTL/LTL road freight and customs clearance, and that is exactly the kind of daily dispatching FleetMind is built for.\n\nFleetMind is a team of AI agents that plans routes, reassigns jobs when traffic, weather or a breakdown hits, keeps drivers within EU hours and tracks fuel cost and CO2. I'd like to offer you a free 2-week pilot on your own routes, with no commitment.\n\nYou can try the live demo here: https://agnaykrishna.github.io/fleetmind/?ref=pelagus\n\nBest regards,\nAgnay Krishna Biju\nbagnaykrishna@gmail.com\n\nNot interested? Just reply \"no thanks\" and I won't contact you again.",
+    "source": "rules",
+    "model": "rules engine",
+    "site_read": true,
+    "generated": "2026-11-25T13:52:53+00:00"
+  },
+  "rixfreight": {
+    "score": 5,
+    "reason": "Fits: international routes, partly forwarding/customs work.",
+    "subject": "Free 2-week AI dispatch pilot for RIX Freight",
+    "body": "Hello RIX Freight team,\n\nI came across RIX Freight while looking at freight companies in Marupe. You focus on international road freight, warehousing and customs, and that is exactly the kind of daily dispatching FleetMind is built for.\n\nFleetMind is a team of AI agents that plans routes, reassigns jobs when traffic, weather or a breakdown hits, keeps drivers within EU hours and tracks fuel cost and CO2. I'd like to offer you a free 2-week pilot on your own routes, with no commitment.\n\nYou can try the live demo here: https://agnaykrishna.github.io/fleetmind/?ref=rixfreight\n\nBest regards,\nAgnay Krishna Biju\nbagnaykrishna@gmail.com\n\nNot interested? Just reply \"no thanks\" and I won't contact you again.",
+    "source": "rules",
+    "model": "rules engine",
+    "site_read": true,
+    "generated": "2026-11-25T13:52:54+00:00"
+  },
+  "totaltransport": {
+    "score": 8,
+    "reason": "Fits: runs its own trucks, international routes.",
+    "subject": "Free 2-week AI dispatch pilot for Total Transport",
+    "body": "Hello Total Transport team,\n\nI came across Total Transport while looking at freight companies in Tiraine (Marupe). You focus on own-fleet road transport, cabotage and express deliveries, and that is exactly the kind of daily dispatching FleetMind is built for.\n\nFleetMind is a team of AI agents that plans routes, reassigns jobs when traffic, weather or a breakdown hits, keeps drivers within EU hours and tracks fuel cost and CO2. I'd like to offer you a free 2-week pilot on your own routes, with no commitment.\n\nYou can try the live demo here: https://agnaykrishna.github.io/fleetmind/?ref=totaltransport\n\nBest regards,\nAgnay Krishna Biju\nbagnaykrishna@gmail.com\n\nNot interested? Just reply \"no thanks\" and I won't contact you again.",
+    "source": "rules",
+    "model": "rules engine",
+    "site_read": true,
+    "generated": "2026-11-25T13:52:55+00:00"
+  },
+  "kravasauto": {
+    "score": 5,
+    "reason": "General road freight company.",
+    "subject": "Free 2-week AI dispatch pilot for Kravas Auto",
+    "body": "Hello Kravas Auto team,\n\nI came across Kravas Auto while looking at freight companies in Riga. You focus on road freight in Latvia, Estonia and Lithuania, and that is exactly the kind of daily dispatching FleetMind is built for.\n\nFleetMind is a team of AI agents that plans routes, reassigns jobs when traffic, weather or a breakdown hits, keeps drivers within EU hours and tracks fuel cost and CO2. I'd like to offer you a free 2-week pilot on your own routes, with no commitment.\n\nYou can try the live demo here: https://agnaykrishna.github.io/fleetmind/?ref=kravasauto\n\nBest regards,\nAgnay Krishna Biju\nbagnaykrishna@gmail.com\n\nNot interested? Just reply \"no thanks\" and I won't contact you again.",
+    "source": "rules",
+    "model": "rules engine",
+    "site_read": true,
+    "generated": "2026-11-25T13:52:57+00:00"
+  },
+  "aimer": {
+    "score": 7,
+    "reason": "Fits: temperature-controlled loads where ETAs matter, specialised heavy or timber cargo, international routes, partly forwarding/customs work.",
+    "subject": "Free 2-week AI dispatch pilot for Aimer",
+    "body": "Hello Aimer team,\n\nI came across Aimer while looking at freight companies in Riga. You focus on full, groupage and oversize loads, plus rail transport, and that is exactly the kind of daily dispatching FleetMind is built for.\n\nFleetMind is a team of AI agents that plans routes, reassigns jobs when traffic, weather or a breakdown hits, keeps drivers within EU hours and tracks fuel cost and CO2. I'd like to offer you a free 2-week pilot on your own routes, with no commitment.\n\nYou can try the live demo here: https://agnaykrishna.github.io/fleetmind/?ref=aimer\n\nBest regards,\nAgnay Krishna Biju\nbagnaykrishna@gmail.com\n\nNot interested? Just reply \"no thanks\" and I won't contact you again.",
+    "source": "rules",
+    "model": "rules engine",
+    "site_read": true,
+    "generated": "2026-11-25T13:52:58+00:00"
+  },
+  "scanfreight": {
+    "score": 5,
+    "reason": "Fits: international routes, partly forwarding/customs work.",
+    "subject": "Free 2-week AI dispatch pilot for Scanfreight Latvia",
+    "body": "Hello Scanfreight Latvia team,\n\nI came across Scanfreight Latvia while looking at freight companies in Liepaja. You focus on road freight to and from Scandinavia, and that is exactly the kind of daily dispatching FleetMind is built for.\n\nFleetMind is a team of AI agents that plans routes, reassigns jobs when traffic, weather or a breakdown hits, keeps drivers within EU hours and tracks fuel cost and CO2. I'd like to offer you a free 2-week pilot on your own routes, with no commitment.\n\nYou can try the live demo here: https://agnaykrishna.github.io/fleetmind/?ref=scanfreight\n\nBest regards,\nAgnay Krishna Biju\nbagnaykrishna@gmail.com\n\nNot interested? Just reply \"no thanks\" and I won't contact you again.",
+    "source": "rules",
+    "model": "rules engine",
+    "site_read": true,
+    "generated": "2026-11-25T13:52:58+00:00"
+  },
+  "ritlogistika": {
+    "score": 9,
+    "reason": "Fits: runs its own trucks, temperature-controlled loads where ETAs matter, specialised heavy or timber cargo, international routes, partly forwarding/customs work.",
+    "subject": "Free 2-week AI dispatch pilot for RITLOGISTIKA",
+    "body": "Hello RITLOGISTIKA team,\n\nI came across RITLOGISTIKA while looking at freight companies in Riga. You focus on domestic and international freight incl. temperature-controlled loads, and that is exactly the kind of daily dispatching FleetMind is built for.\n\nFleetMind is a team of AI agents that plans routes, reassigns jobs when traffic, weather or a breakdown hits, keeps drivers within EU hours and tracks fuel cost and CO2. I'd like to offer you a free 2-week pilot on your own routes, with no commitment.\n\nYou can try the live demo here: https://agnaykrishna.github.io/fleetmind/?ref=ritlogistika\n\nBest regards,\nAgnay Krishna Biju\nbagnaykrishna@gmail.com\n\nNot interested? Just reply \"no thanks\" and I won't contact you again.",
+    "source": "rules",
+    "model": "rules engine",
+    "site_read": true,
+    "generated": "2026-11-25T13:52:59+00:00"
+  },
+  "cargoriga": {
+    "score": 7,
+    "reason": "Fits: temperature-controlled loads where ETAs matter, international routes.",
+    "subject": "Free 2-week AI dispatch pilot for Cargoriga",
+    "body": "Hello Cargoriga team,\n\nI came across Cargoriga while looking at freight companies in Riga. You focus on freight transport, refrigerated haulage, removals and vehicle transport, and that is exactly the kind of daily dispatching FleetMind is built for.\n\nFleetMind is a team of AI agents that plans routes, reassigns jobs when traffic, weather or a breakdown hits, keeps drivers within EU hours and tracks fuel cost and CO2. I'd like to offer you a free 2-week pilot on your own routes, with no commitment.\n\nYou can try the live demo here: https://agnaykrishna.github.io/fleetmind/?ref=cargoriga\n\nBest regards,\nAgnay Krishna Biju\nbagnaykrishna@gmail.com\n\nNot interested? Just reply \"no thanks\" and I won't contact you again.",
+    "source": "rules",
+    "model": "rules engine",
+    "site_read": true,
+    "generated": "2026-11-25T13:53:00+00:00"
+  },
+  "laskana": {
+    "score": 6,
+    "reason": "Fits: specialised heavy or timber cargo.",
+    "subject": "Free 2-week AI dispatch pilot for Laskana",
+    "body": "Hello Laskana team,\n\nI came across Laskana while looking at freight companies in Liepaja. You focus on timber and bulk cargo transport from the Port of Liepaja, and that is exactly the kind of daily dispatching FleetMind is built for.\n\nFleetMind is a team of AI agents that plans routes, reassigns jobs when traffic, weather or a breakdown hits, keeps drivers within EU hours and tracks fuel cost and CO2. I'd like to offer you a free 2-week pilot on your own routes, with no commitment.\n\nYou can try the live demo here: https://agnaykrishna.github.io/fleetmind/?ref=laskana\n\nBest regards,\nAgnay Krishna Biju\nbagnaykrishna@gmail.com\n\nNot interested? Just reply \"no thanks\" and I won't contact you again.",
+    "source": "rules",
+    "model": "rules engine",
+    "site_read": true,
+    "generated": "2026-11-25T13:53:04+00:00"
+  },
+  "maho": {
+    "score": 5,
+    "reason": "Fits: international routes, partly forwarding/customs work.",
+    "subject": "Free 2-week AI dispatch pilot for Maho",
+    "body": "Hello Maho team,\n\nI came across Maho while looking at freight companies in Riga. You focus on logistics company: full and groupage road transport, and that is exactly the kind of daily dispatching FleetMind is built for.\n\nFleetMind is a team of AI agents that plans routes, reassigns jobs when traffic, weather or a breakdown hits, keeps drivers within EU hours and tracks fuel cost and CO2. I'd like to offer you a free 2-week pilot on your own routes, with no commitment.\n\nYou can try the live demo here: https://agnaykrishna.github.io/fleetmind/?ref=maho\n\nBest regards,\nAgnay Krishna Biju\nbagnaykrishna@gmail.com\n\nNot interested? Just reply \"no thanks\" and I won't contact you again.",
+    "source": "rules",
+    "model": "rules engine",
+    "site_read": true,
+    "generated": "2026-11-25T13:53:06+00:00"
+  },
+  "imola": {
+    "score": 8,
+    "reason": "Fits: runs its own trucks, specialised heavy or timber cargo.",
+    "subject": "Free 2-week AI dispatch pilot for Imola",
+    "body": "Hello Imola team,\n\nI came across Imola while looking at freight companies in Salaspils. You focus on own fleet, oversize and heavy cargo transport, and that is exactly the kind of daily dispatching FleetMind is built for.\n\nFleetMind is a team of AI agents that plans routes, reassigns jobs when traffic, weather or a breakdown hits, keeps drivers within EU hours and tracks fuel cost and CO2. I'd like to offer you a free 2-week pilot on your own routes, with no commitment.\n\nYou can try the live demo here: https://agnaykrishna.github.io/fleetmind/?ref=imola\n\nBest regards,\nAgnay Krishna Biju\nbagnaykrishna@gmail.com\n\nNot interested? Just reply \"no thanks\" and I won't contact you again.",
+    "source": "rules",
+    "model": "rules engine",
+    "site_read": true,
+    "generated": "2026-11-25T13:53:07+00:00"
+  },
+  "astgrupa": {
+    "score": 9,
+    "reason": "Fits: runs its own trucks, temperature-controlled loads where ETAs matter, international routes.",
+    "subject": "Free 2-week AI dispatch pilot for AST Grupa",
+    "body": "Hello AST Grupa team,\n\nI came across AST Grupa while looking at freight companies in Riga. You focus on international road freight with own Scania fleet and Frigo trailers, and that is exactly the kind of daily dispatching FleetMind is built for.\n\nFleetMind is a team of AI agents that plans routes, reassigns jobs when traffic, weather or a breakdown hits, keeps drivers within EU hours and tracks fuel cost and CO2. I'd like to offer you a free 2-week pilot on your own routes, with no commitment.\n\nYou can try the live demo here: https://agnaykrishna.github.io/fleetmind/?ref=astgrupa\n\nBest regards,\nAgnay Krishna Biju\nbagnaykrishna@gmail.com\n\nNot interested? Just reply \"no thanks\" and I won't contact you again.",
+    "source": "rules",
+    "model": "rules engine",
+    "site_read": true,
+    "generated": "2026-11-25T13:53:07+00:00"
+  },
+  "posthaul": {
+    "score": 6,
+    "reason": "Fits: specialised heavy or timber cargo, international routes, partly forwarding/customs work.",
+    "subject": "Free 2-week AI dispatch pilot for Posthaul",
+    "body": "Hello Posthaul team,\n\nI came across Posthaul while looking at freight companies in Riga. You focus on international freight in Europe, Scandinavia and the Baltics, and that is exactly the kind of daily dispatching FleetMind is built for.\n\nFleetMind is a team of AI agents that plans routes, reassigns jobs when traffic, weather or a breakdown hits, keeps drivers within EU hours and tracks fuel cost and CO2. I'd like to offer you a free 2-week pilot on your own routes, with no commitment.\n\nYou can try the live demo here: https://agnaykrishna.github.io/fleetmind/?ref=posthaul\n\nBest regards,\nAgnay Krishna Biju\nbagnaykrishna@gmail.com\n\nNot interested? Just reply \"no thanks\" and I won't contact you again.",
+    "source": "rules",
+    "model": "rules engine",
+    "site_read": true,
+    "generated": "2026-11-25T13:53:08+00:00"
+  },
+  "hrx": {
+    "score": 8,
+    "reason": "Fits: runs its own trucks, international routes.",
+    "subject": "Free 2-week AI dispatch pilot for HRX Latvia",
+    "body": "Hello HRX Latvia team,\n\nI came across HRX Latvia while looking at freight companies in Kekava. You focus on international and local freight, domestic trucking, and that is exactly the kind of daily dispatching FleetMind is built for.\n\nFleetMind is a team of AI agents that plans routes, reassigns jobs when traffic, weather or a breakdown hits, keeps drivers within EU hours and tracks fuel cost and CO2. I'd like to offer you a free 2-week pilot on your own routes, with no commitment.\n\nYou can try the live demo here: https://agnaykrishna.github.io/fleetmind/?ref=hrx\n\nBest regards,\nAgnay Krishna Biju\nbagnaykrishna@gmail.com\n\nNot interested? Just reply \"no thanks\" and I won't contact you again.",
+    "source": "rules",
+    "model": "rules engine",
+    "site_read": true,
+    "generated": "2026-11-25T13:53:09+00:00"
+  }
+}

@@ -1,7 +1,7 @@
 :root {
   --bg: #0b1017; --panel: #121a24; --panel2: #18222f; --line: #233042; --text: #e6edf5; --muted: #8b9bb0;
   --accent: #4fa3ff; --ok: #34d399; --load: #60a5fa; --idle: #94a3b8; --warn: #fbbf24; --bad: #f87171; --svc: #c084fc;
-  --orch: #4fa3ff; --route: #34d399; --disp: #fbbf24; --maint: #c084fc; --fuel: #fb923c; --mgr: #f472b6;
+  --orch: #4fa3ff; --route: #34d399; --disp: #fbbf24; --maint: #c084fc; --fuel: #fb923c; --mgr: #f472b6; --gtm: #2dd4bf;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.45 Inter, system-ui, sans-serif; }
@@ -28,7 +28,7 @@ main { display: grid; grid-template-columns: 1fr 410px; height: calc(100vh - 57p
 .legend { position: absolute; top: 10px; left: 50px; z-index: 500; display: flex; gap: 10px; background: rgba(18,26,36,.9);
   padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); font-size: 11px; }
 .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; }
-.kpis { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 500; display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
+.kpis { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 500; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; }
 .kpi { background: rgba(18,26,36,.93); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
 .kpi b { display: block; font-size: 18px; font-family: 'JetBrains Mono', monospace; }
 .kpi span { color: var(--muted); font-size: 11px; }
@@ -68,7 +68,7 @@ aside { display: flex; flex-direction: column; gap: 10px; padding: 10px; border-
 .entry.llm { background: rgba(124,92,255,.09); }
 @keyframes fade { from { opacity: 0; transform: translateY(-4px); } }
 
-.bottom { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; padding: 10px; height: 250px; border-top: 1px solid var(--line); }
+.bottom { display: grid; grid-template-columns: 1fr 1.4fr 1.1fr; gap: 10px; padding: 10px; height: 300px; border-top: 1px solid var(--line); }
 .bottom .panel { min-height: 0; display: flex; flex-direction: column; }
 .chart canvas { flex: 1; min-height: 0; }
 .tablewrap { overflow: auto; flex: 1; }
@@ -109,8 +109,29 @@ tr { cursor: pointer; } tr:hover td { background: var(--panel2); }
 @media (max-width: 1100px) {
   main { grid-template-columns: 1fr; height: auto; }
   .mapwrap { height: 520px; }
-  .kpis { grid-template-columns: repeat(4, 1fr); }
+  .kpis { grid-auto-flow: row; grid-template-columns: repeat(5, 1fr); }
   .bottom { grid-template-columns: 1fr; height: auto; }
-  .chart { height: 260px; } .fleet { height: 320px; }
+  .chart { height: 260px; } .fleet { height: 320px; } .gtm { height: 420px; }
 }
 .pop-sep { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
+@media (min-width: 1101px) { .bottom.no-gtm { grid-template-columns: 1fr 1.4fr; } }
+.kpi span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.gtm h2 small { color: var(--muted); font-weight: 400; font-size: 11px; }
+.gtmwrap { position: relative; overflow: auto; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.lead { background: var(--panel2); border-radius: 8px; }
+.lead.open { border: 1px solid var(--line); padding-bottom: 8px; }
+.lead-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; cursor: pointer; }
+.lead-row:hover { background: rgba(255,255,255,.03); }
+.score { min-width: 24px; text-align: center; border: 1px solid; border-radius: 6px; font: 600 12px 'JetBrains Mono', monospace; padding: 1px 4px; }
+.lname { flex: 1; min-width: 0; font-size: 12px; }
+.lname small { display: block; color: var(--muted); font-size: 11px; }
+.gst { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; padding: 2px 6px; border-radius: 5px; background: var(--panel); color: var(--muted); }
+.gst.approved { color: var(--accent); } .gst.sent { color: var(--warn); } .gst.replied { color: var(--ok); }
+.lead .why { margin: 4px 10px; font-size: 12px; color: var(--text); } .lead .why small { color: var(--muted); }
+.mail { margin: 6px 10px; font-size: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+.mail span { color: var(--muted); display: inline-block; width: 52px; }
+.mail pre { white-space: pre-wrap; font: 12px/1.45 Inter, sans-serif; margin: 6px 0 0; max-height: 220px; overflow: auto; }
+.mail-actions, .lead .btns { display: flex; gap: 6px; align-items: center; margin: 6px 10px 0; flex-wrap: wrap; }
+.mail-actions button, .mail-actions a, .lead .btns button, .lead .btns a { font-size: 12px; padding: 5px 10px; border-radius: 7px;
+  background: var(--panel); border: 1px solid var(--line); color: var(--text); text-decoration: none; cursor: pointer; }
+.gtm-gmail, .gtm-set:not(.back) { background: var(--accent) !important; color: #04121f !important; border: 0 !important; font-weight: 600; }
