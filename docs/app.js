@@ -69,7 +69,7 @@ function drawMap(s) {
     seen.add(v.id);
     if (!markers[v.id]) {
       markers[v.id] = L.marker([v.lat, v.lon], { icon: vehicleIcon(v), zIndexOffset: 500 }).addTo(map)
-        .on("click", () => select(v.id));
+        .on("click", () => select(v.id, true));
       markers[v.id].bindPopup("");
     }
     const m = markers[v.id];
@@ -107,13 +107,15 @@ function drawMap(s) {
   for (const id in zoneLayers) if (!zseen.has(id)) { map.removeLayer(zoneLayers[id]); delete zoneLayers[id]; }
 }
 
-function select(id) {
+// fromMap: the click was on the marker itself. Leaflet's bindPopup click handler
+// already opens/closes the popup then, so opening it here too would toggle it shut.
+function select(id, fromMap = false) {
   selected = selected === id ? null : id;
   for (const k in markers) markers[k]._k = null;
   if (selected && lastState) {
     const v = lastState.vehicles.find(x => x.id === selected);
-    if (v) { map.panTo([v.lat, v.lon]); markers[selected].openPopup(); }
-  }
+    if (v) { map.panTo([v.lat, v.lon]); if (!fromMap) markers[selected].openPopup(); }
+  } else if (!selected && !fromMap) map.closePopup();
   if (lastState) { drawMap(lastState); drawFleet(lastState); }
 }
 
