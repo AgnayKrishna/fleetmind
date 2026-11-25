@@ -397,6 +397,45 @@ class World:
         else:
             v["status"] = "idle"
 
+    # ---------------- trip summary for the vehicle popup ----------------
+    def _trip_info(self, v):
+        """Where the vehicle is heading, how far is left and whether its job will make the deadline.
+        ETA uses the current speed (weather, traffic) plus 20 min loading / unloading, like dispatch does."""
+        st, job = v["status"], (self.jobs.get(v["job_id"]) if v["job_id"] else None)
+        spd = max(25.0, v["base_speed"] * self.speed_factor(v))
+        t = self.sim + (max(0.0, v["phase_until"] - self.sim) if st in TIMED else 0.0)
+        leg = (v["route_km"] - v["pos_km"]) if v["route"] else None   # km left on the current route
+
+        def km_to(p):
+            return leg if leg is not None else services.haversine(v["lat"], v["lon"], p["lat"], p["lon"]) * 1.25
+
+        if not job:
+            if st == "to_depot" or v.get("after_route") == "to_depot":
+                home = loc(v["home"])
+                km = km_to(home)
+                return {"destination": home["name"], "remaining_km": round(km), "eta": clock_str(t + km / spd * 60)[-5:]}
+            return None
+        if job["status"] == "assigned":           # still driving to the pickup (or a breakdown hand-over)
+            target = job.get("transfer_from") or job["pickup"]
+            first = km_to(target)
+            remaining = first + job["est_km"]
+            eta = t + first / spd * 60 + 20 + job["est_km"] / spd * 60 + 20
+        else:                                     # loading, in transit or unloading at the drop-off
+            target = job["dropoff"]
+            if st == "loading":
+                remaining = job["est_km"]
+            elif st == "unloading":
+                remaining = 0.0
+            else:
+                remaining = km_to(target)
+            eta = t + remaining / spd * 60 + (0 if st == "unloading" else 20)
+        return {"destination": target["name"], "remaining_km": round(remaining),
+                "eta": clock_str(eta)[-5:], "deadline": clock_str(job["window_end"])[-5:],
+                "on_time": eta <= job["window_end"], "late_min": max(0, round(eta - job["window_end"])),
+                "cargo": job["cargo"], "weight": job["weight"], "priority": job["priority"],
+                "pickup": job["pickup"]["name"], "dropoff": job["dropoff"]["name"],
+                "customer_notified": job["customer_notified"]}
+
     # ---------------- snapshot for the dashboard ----------------
     def snapshot(self, log_after=0):
         with self.lock:
@@ -416,7 +455,7 @@ class World:
                     "service_due_km": round(v["service_km"] - v["km_since_service"]),
                     "drive_today_h": round(v["drive_today"] / 60, 1),
                     "since_break_h": round(v["drive_since_break"] / 60, 1),
-                    "odometer": round(v["odometer"]), "route": remaining,
+                    "odometer": round(v["odometer"]), "route": remaining, "trip": self._trip_info(v),
                     "speed_factor": round(self.speed_factor(v), 2) if v["status"] in MOVING else None})
             k = dict(self.kpi)
             k["on_time_pct"] = round(100 * (k["delivered"] - k["late"]) / k["delivered"]) if k["delivered"] else 100

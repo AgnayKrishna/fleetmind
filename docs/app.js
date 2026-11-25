@@ -54,10 +54,29 @@ function vehicleIcon(v) {
     html: `<div class="vmark ${selected === v.id ? "sel" : ""}" style="background:${c}">${short(v.id)}</div>` });
 }
 
+// Job + trip block: cargo, pickup -> drop-off, where it's heading now, km left,
+// ETA against the deadline and whether the customer has been told.
+function tripHtml(v) {
+  const t = v.trip;
+  if (!t) return `<br>Job: -`;
+  if (!t.cargo) return `<br>Heading to: ${esc(t.destination)}<br>Remaining: ${t.remaining_km} km · ETA ${t.eta}`;
+  const due = t.on_time
+    ? `<span style="color:var(--ok);font-weight:600">on time</span>`
+    : `<span style="color:var(--bad);font-weight:600">late${t.late_min ? ` by ${t.late_min} min` : ""}</span>`;
+  return `<hr class="pop-sep">Job: <b>${v.job_id}</b>${t.priority === "urgent" ? ` <span style="color:var(--bad)">URGENT</span>` : ""}
+    <br>Cargo: ${esc(t.cargo)} · ${t.weight.toLocaleString()} kg
+    <br>${esc(t.pickup)} → ${esc(t.dropoff)}
+    <br>Heading to: <b>${esc(t.destination)}</b>
+    <br>Remaining: ${t.remaining_km} km to drop-off
+    <br>ETA ${t.eta} · deadline ${t.deadline} · ${due}
+    <br>Customer notified: ${t.customer_notified ? "yes" : "no"}`;
+}
+
 function popup(v) {
   return `<b>${v.id}</b> · ${v.label}<br>Driver: ${esc(v.driver)}<br>Status: <b>${STATUS_TEXT[v.status] || v.status}</b>
     ${v.fault ? `<br><span style="color:var(--bad)">Fault: ${esc(v.fault)}</span>` : ""}
-    <br>Job: ${v.job_id || "-"}<br>Energy: ${v.energy_pct}% (${v.range_km} km range)
+    ${tripHtml(v)}
+    <br>Energy: ${v.energy_pct}% (${v.range_km} km range)
     <br>Health: ${v.health}% · service in ${v.service_due_km.toLocaleString()} km
     <br>Driving today: ${v.drive_today_h} h · since break ${v.since_break_h} h
     ${v.speed_factor !== null && v.speed_factor < 1 ? `<br>Slowed to ${Math.round(v.speed_factor * 100)}% speed` : ""}`;
@@ -70,7 +89,7 @@ function drawMap(s) {
     if (!markers[v.id]) {
       markers[v.id] = L.marker([v.lat, v.lon], { icon: vehicleIcon(v), zIndexOffset: 500 }).addTo(map)
         .on("click", () => select(v.id, true));
-      markers[v.id].bindPopup("");
+      markers[v.id].bindPopup("", { autoPanPaddingTopLeft: [20, 60] });  // clear the legend bar
     }
     const m = markers[v.id];
     m.setLatLng([v.lat, v.lon]);
@@ -114,7 +133,8 @@ function select(id, fromMap = false) {
   for (const k in markers) markers[k]._k = null;
   if (selected && lastState) {
     const v = lastState.vehicles.find(x => x.id === selected);
-    if (v) { map.panTo([v.lat, v.lon]); if (!fromMap) markers[selected].openPopup(); }
+    // A clicked marker is already on screen; Leaflet's popup auto-pan then fits the popup.
+    if (v && !fromMap) { map.panTo([v.lat, v.lon]); markers[selected].openPopup(); }
   } else if (!selected && !fromMap) map.closePopup();
   if (lastState) { drawMap(lastState); drawFleet(lastState); }
 }
