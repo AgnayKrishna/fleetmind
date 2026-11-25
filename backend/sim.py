@@ -1,0 +1,459 @@
+"""Live fleet simulation of a mixed freight fleet in Latvia."""
+import random
+import threading
+import time
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
+
+from . import services
+from .data import (CARGO, CO2, DEPOTS, DRIVER_NAMES, FLEET_MIX, LOCATIONS, PRICES, VEHICLE_TYPES,
+                   loc, random_pickup)
+
+MOVING = ("to_pickup", "to_dropoff", "to_depot")
+TIMED = ("loading", "unloading", "break", "refuel", "service", "broken")
+BREAK_AFTER_MIN = 270      # EU rule: 4.5 h driving, then a 45 min break
+BREAK_MIN = 45
+DAILY_DRIVE_MAX = 540      # 9 h per day
+RIGA = (56.95, 24.11)
+
+
+def clock_str(sim_min):
+    day = int(sim_min // 1440) + 1
+    m = int(sim_min % 1440)
+    return f"Day {day} {m // 60:02d}:{m % 60:02d}"
+
+
+class World:
+    def __init__(self, seed=7):
+        self.rng = random.Random(seed)
+        self.lock = threading.RLock()
+        self.sim = 6 * 60.0          # starts 06:00
+        self.speed = 2.0             # sim minutes per real second
+        self.paused = False
+        self.vehicles, self.jobs, self.approvals = {}, {}, {}
+        self.log = deque(maxlen=400)
+        self.zones = []              # traffic incidents
+        self.storm = None
+        self.weather = {"text": "loading...", "source": "-", "temp_c": 2, "precip_mm": 0,
+                        "snow_cm": 0, "wind_kmh": 10, "code": 3}
+        self.weather_real_at = 0.0
+        self.kpi = dict(delivered=0, late=0, km=0.0, diesel_l=0.0, kwh=0.0, fuel_cost=0.0,
+                        energy_cost=0.0, co2_kg=0.0, penalties=0.0, repairs=0.0,
+                        auto_decisions=0, approvals_done=0, llm_decisions=0)
+        self.history = []
+        self.seq = {"job": 100, "log": 0, "appr": 0, "zone": 0}
+        self.next_job_at = self.sim + 20
+        self.next_history = self.sim
+        self.periodic_hook = None    # set by agents: called with (world, sim) every tick
+        self.event_hook = None       # set by agents: random breakdowns go through it
+        self.router = ThreadPoolExecutor(max_workers=2)
+        self._build_fleet()
+        for _ in range(22):
+            self.new_job()
+
+    # ---------------- setup ----------------
+    def _build_fleet(self):
+        names = list(DRIVER_NAMES)
+        self.rng.shuffle(names)
+        n = 0
+        prefix = {"truck_diesel": "T", "van_diesel": "V", "truck_ev": "ET", "van_ev": "EV"}
+        for vtype, count in FLEET_MIX:
+            spec = VEHICLE_TYPES[vtype]
+            for i in range(count):
+                n += 1
+                depot = DEPOTS[n % len(DEPOTS)]
+                d = loc(depot)
+                vid = f"LV-{prefix[vtype]}{i + 1:02d}"
+                self.vehicles[vid] = {
+                    "id": vid, "type": vtype, "label": spec["label"], "energy_type": spec["energy"],
+                    "driver": names[(n - 1) % len(names)], "home": depot,
+                    "lat": d["lat"] + self.rng.uniform(-0.004, 0.004),
+                    "lon": d["lon"] + self.rng.uniform(-0.004, 0.004),
+                    "status": "idle", "job_id": None, "route": [], "cum": [], "route_km": 0.0,
+                    "pos_km": 0.0, "base_speed": spec["speed"], "route_token": 0, "after_route": None,
+                    "phase_until": 0.0, "resume": None, "capacity": spec["capacity"],
+                    "tank": spec["tank"], "unit": spec["unit"],
+                    "energy": spec["tank"] * self.rng.uniform(0.45, 1.0),
+                    "odometer": self.rng.randint(20000, 420000),
+                    "km_since_service": self.rng.randint(2000, int(spec["service_km"] * 0.97)),
+                    "service_km": spec["service_km"], "health": self.rng.randint(55, 100),
+                    "drive_since_break": self.rng.randint(0, 60), "drive_today": 0.0,
+                    "use_mult": 1.0, "avoid_zones": set(), "fault": None, "trip_km": 0.0,
+                }
+
+    # ---------------- logging ----------------
+    def add_log(self, agent, text, kind="info", model=None, extra=None):
+        with self.lock:
+            self.seq["log"] += 1
+            self.log.append({"id": self.seq["log"], "t": clock_str(self.sim), "agent": agent,
+                             "kind": kind, "text": text, "model": model, "extra": extra})
+
+    # ---------------- jobs ----------------
+    def new_job(self, urgent=False, pickup=None, dropoff=None, weight=None):
+        with self.lock:
+            self.seq["job"] += 1
+            jid = f"J{self.seq['job']}"
+            p = pickup or random_pickup(self.rng)
+            d = dropoff or self.rng.choice([k for k in LOCATIONS if k != p])
+            if weight is None:
+                weight = (self.rng.randint(300, 1400) if self.rng.random() < 0.35
+                          else self.rng.randint(4000, 15500))
+            P, D = loc(p), loc(d)
+            km = services.haversine(P["lat"], P["lon"], D["lat"], D["lon"]) * 1.25
+            est = km / 65 * 60 + 40
+            slack = self.rng.randint(60, 120) if urgent else self.rng.randint(120, 300)
+            self.jobs[jid] = {
+                "id": jid, "pickup": P, "dropoff": D, "weight": weight, "cargo": self.rng.choice(CARGO),
+                "priority": "urgent" if urgent else "normal", "status": "pending", "vehicle": None,
+                "created": self.sim, "window_end": self.sim + est + slack, "est_km": km,
+                "delivered_at": None, "late": False, "customer_notified": False,
+            }
+            return self.jobs[jid]
+
+    # ---------------- geometry ----------------
+    @staticmethod
+    def _cum(coords):
+        cum = [0.0]
+        for a, b in zip(coords, coords[1:]):
+            cum.append(cum[-1] + services.haversine(a[0], a[1], b[0], b[1]))
+        return cum
+
+    def set_route(self, v, route):
+        coords = route["coords"] or [[v["lat"], v["lon"]]]
+        v["route"], v["cum"] = coords, self._cum(coords)
+        v["route_km"] = v["cum"][-1]
+        v["pos_km"] = 0.0
+        spec_speed = VEHICLE_TYPES[v["type"]]["speed"]
+        if route["minutes"] > 0:
+            v["base_speed"] = max(30, min(spec_speed, route["km"] / (route["minutes"] / 60) * 0.92))
+        v["route_source"] = route["source"]
+
+    def _point_at(self, v, km):
+        cum, rt = v["cum"], v["route"]
+        if not rt:
+            return v["lat"], v["lon"]
+        if km >= cum[-1]:
+            return rt[-1][0], rt[-1][1]
+        lo, hi = 0, len(cum) - 1
+        while lo < hi - 1:
+            mid = (lo + hi) // 2
+            if cum[mid] <= km:
+                lo = mid
+            else:
+                hi = mid
+        seg = cum[hi] - cum[lo] or 1e-9
+        f = (km - cum[lo]) / seg
+        return rt[lo][0] + (rt[hi][0] - rt[lo][0]) * f, rt[lo][1] + (rt[hi][1] - rt[lo][1]) * f
+
+    def request_route(self, v, lat, lon, next_status, alternatives=False, pick=0):
+        """Ask OSRM for a route in the background; vehicle waits in 'routing'."""
+        v["route_token"] += 1
+        token = v["route_token"]
+        v["status"], v["after_route"] = "routing", next_status
+        a, b = (v["lat"], v["lon"]), (lat, lon)
+
+        def work():
+            routes = services.get_routes(a, b, alternatives=alternatives)
+            route = routes[min(pick, len(routes) - 1)]
+            with self.lock:
+                if v["route_token"] == token and v["status"] == "routing":
+                    self.set_route(v, route)
+                    v["status"] = next_status
+        self.router.submit(work)
+
+    # ---------------- dispatch helpers ----------------
+    def range_km(self, v):
+        return v["energy"] / (VEHICLE_TYPES[v["type"]]["use_per_km"] * v["use_mult"])
+
+    def dispatch_candidates(self, job, allow_bump=False, origin=None, limit=5):
+        """Feasible vehicles for a job, best first. Checks capacity, driver hours, range, health."""
+        P = origin or job["pickup"]
+        out = []
+        for v in self.vehicles.values():
+            bump = None
+            if v["status"] == "idle":
+                pass
+            elif allow_bump and v["status"] in ("to_pickup", "routing") and v["job_id"]:
+                other = self.jobs.get(v["job_id"])
+                if not other or other["status"] != "assigned" or other["priority"] == "urgent":
+                    continue
+                bump = other["id"]
+            else:
+                continue
+            if v["capacity"] < job["weight"] or v["health"] < 25:
+                continue
+            dead_km = services.haversine(v["lat"], v["lon"], P["lat"], P["lon"]) * 1.25
+            trip_km = dead_km + job["est_km"]
+            trip_min = trip_km / 62 * 60 + 40
+            if v["drive_today"] + trip_min > DAILY_DRIVE_MAX:
+                continue
+            rng_km = self.range_km(v)
+            needs_charge = rng_km < trip_km * 1.15
+            if needs_charge and v["energy_type"] == "electric":
+                continue  # EVs must make the trip on current charge
+            eta = self.sim + dead_km / 62 * 60 + 20 + job["est_km"] / 62 * 60 + 20
+            use = VEHICLE_TYPES[v["type"]]["use_per_km"]
+            price = PRICES["diesel_eur_l"] if v["energy_type"] == "diesel" else PRICES["electricity_eur_kwh"]
+            cost = trip_km * use * price
+            waste = (v["capacity"] - job["weight"]) / v["capacity"]  # prefer a right-sized vehicle
+            score = dead_km + waste * 25 + (30 if needs_charge else 0) + (40 if bump else 0) \
+                + (15 if eta > job["window_end"] else 0)
+            out.append({"vehicle": v["id"], "type": v["label"], "driver": v["driver"],
+                        "deadhead_km": round(dead_km, 1), "trip_km": round(trip_km, 1),
+                        "energy_cost_eur": round(cost, 2), "eta": clock_str(eta),
+                        "on_time": eta <= job["window_end"], "capacity_kg": v["capacity"],
+                        "range_km": round(rng_km), "driver_hours_left": round((DAILY_DRIVE_MAX - v["drive_today"]) / 60, 1),
+                        "health": v["health"], "bumps_job": bump, "score": round(score, 1)})
+        out.sort(key=lambda c: c["score"])
+        return out[:limit]
+
+    def assign(self, vid, jid, bump=None):
+        v, job = self.vehicles[vid], self.jobs[jid]
+        if bump and bump in self.jobs:
+            bj = self.jobs[bump]
+            bj["status"], bj["vehicle"] = "pending", None
+        if v["job_id"] and v["job_id"] != jid and v["job_id"] in self.jobs:
+            oj = self.jobs[v["job_id"]]
+            if oj["status"] == "assigned":
+                oj["status"], oj["vehicle"] = "pending", None
+        job["status"], job["vehicle"] = "assigned", vid
+        v["job_id"] = jid
+        if job.get("transfer_from"):
+            target = job["transfer_from"]
+        else:
+            target = job["pickup"]
+        self.request_route(v, target["lat"], target["lon"], "to_pickup")
+
+    # ---------------- per-tick update ----------------
+    def speed_factor(self, v):
+        f = services.weather_speed_factor(self.weather)
+        if self.storm and self.sim < self.storm["until"]:
+            f = min(f, self.storm["factor"])
+        hour = (self.sim % 1440) / 60
+        near_riga = services.haversine(v["lat"], v["lon"], *RIGA) < 22
+        if near_riga and (7.5 <= hour <= 9.5 or 16.5 <= hour <= 18.5):
+            f *= 0.8  # rush hour in Riga
+        for z in self.zones:
+            if z["until"] > self.sim and z["id"] not in v["avoid_zones"]:
+                if services.haversine(v["lat"], v["lon"], z["lat"], z["lon"]) < z["radius_km"]:
+                    f = min(f, z["factor"])
+        return f
+
+    def tick(self, dt):
+        with self.lock:
+            self.sim += dt
+            now = self.sim
+            for v in self.vehicles.values():
+                st = v["status"]
+                if st in TIMED and now >= v["phase_until"]:
+                    self._finish_phase(v)
+                elif st in MOVING:
+                    self._move(v, dt)
+            self.zones = [z for z in self.zones if z["until"] > now]
+            if self.storm and now > self.storm["until"]:
+                self.add_log("Route Agent", "Storm conditions cleared, normal speeds resumed.")
+                self.storm = None
+            if now >= self.next_job_at or sum(j["status"] == "pending" for j in self.jobs.values()) < 3:
+                j = self.new_job()
+                self.next_job_at = now + self.rng.randint(25, 50)
+                self.add_log("Orchestrator", f"New freight order {j['id']}: {j['weight']:,} kg {j['cargo']} "
+                             f"{j['pickup']['name']} -> {j['dropoff']['name']}")
+            self._routine_dispatch()
+            if now >= self.next_history:
+                self.next_history = now + 30
+                k = self.kpi
+                self.history.append({"t": clock_str(now)[-5:], "cost": round(k["fuel_cost"] + k["energy_cost"], 2),
+                                     "delivered": k["delivered"], "late": k["late"]})
+                self.history = self.history[-60:]
+        if self.periodic_hook:
+            self.periodic_hook(self, now)
+
+    def _routine_dispatch(self):
+        pending = sorted((j for j in self.jobs.values() if j["status"] == "pending" and not j.get("hold")),
+                         key=lambda j: (j["priority"] != "urgent", j["window_end"]))
+        done = 0
+        for job in pending:
+            if done >= 3:
+                break
+            cands = self.dispatch_candidates(job, limit=1)
+            if cands:
+                c = cands[0]
+                self.assign(c["vehicle"], job["id"])
+                self.kpi["auto_decisions"] += 1
+                done += 1
+                self.add_log("Dispatch Agent", f"Assigned {job['id']} ({job['weight']:,} kg) to {c['vehicle']} "
+                             f"({c['type']}, {c['deadhead_km']} km away, ETA {c['eta'][-5:]}).", "decision")
+
+    def _move(self, v, dt):
+        spec = VEHICLE_TYPES[v["type"]]
+        speed = v["base_speed"] * self.speed_factor(v)
+        km = min(speed * dt / 60, v["route_km"] - v["pos_km"])
+        v["pos_km"] += km
+        v["lat"], v["lon"] = self._point_at(v, v["pos_km"])
+        # energy and cost
+        mult = v["use_mult"] * (1.2 if v["energy_type"] == "electric" and (self.weather.get("temp_c") or 5) < 0 else 1)
+        used = km * spec["use_per_km"] * mult
+        v["energy"] = max(0.0, v["energy"] - used)
+        k = self.kpi
+        k["km"] += km
+        if v["energy_type"] == "diesel":
+            k["diesel_l"] += used
+            k["fuel_cost"] += used * PRICES["diesel_eur_l"]
+            k["co2_kg"] += used * CO2["diesel_kg_l"]
+        else:
+            k["kwh"] += used
+            k["energy_cost"] += used * PRICES["electricity_eur_kwh"]
+            k["co2_kg"] += used * CO2["electric_kg_kwh"]
+        v["odometer"] += km
+        v["km_since_service"] += km
+        v["trip_km"] += km
+        v["drive_since_break"] += dt
+        v["drive_today"] += dt
+        if self.rng.random() < km * 0.004:
+            v["health"] = max(0, v["health"] - 1)
+        # arrival
+        if v["pos_km"] >= v["route_km"] - 0.01:
+            self._arrive(v)
+            return
+        # driver break (EU 561/2006)
+        if v["drive_since_break"] >= BREAK_AFTER_MIN:
+            v["resume"], v["status"] = v["status"], "break"
+            v["phase_until"] = self.sim + BREAK_MIN
+            v["drive_since_break"] = 0
+            self.add_log("Dispatch Agent", f"{v['id']} driver {v['driver']} reached 4.5 h driving: "
+                         f"mandatory 45 min break started.", "decision")
+            return
+        # low energy
+        if v["energy"] / v["tank"] < 0.12:
+            v["resume"], v["status"] = v["status"], "refuel"
+            mins = 20 if v["energy_type"] == "diesel" else 40
+            v["phase_until"] = self.sim + mins
+            what = "refuel stop" if v["energy_type"] == "diesel" else "fast-charge stop"
+            self.kpi["auto_decisions"] += 1
+            self.add_log("Fuel & Cost Agent", f"{v['id']} below 12% {v['unit']}: scheduled {mins} min {what}.",
+                         "decision")
+            return
+        # rare random breakdown, more likely on poor-health vehicles
+        if self.event_hook and self.rng.random() < km * 0.00002 * (1 + (100 - v["health"]) / 25):
+            self.event_hook("breakdown", v["id"], source="sensor")
+
+    def _arrive(self, v):
+        job = self.jobs.get(v["job_id"]) if v["job_id"] else None
+        st = v["status"]
+        if st == "to_pickup" and job:
+            v["status"], v["phase_until"] = "loading", self.sim + 20
+            job["status"] = "loading"
+        elif st == "to_dropoff" and job:
+            v["status"], v["phase_until"] = "unloading", self.sim + 20
+        elif st == "to_depot":
+            if v.get("service_pending"):
+                v["status"], v["phase_until"] = "service", self.sim + 60
+                v["service_pending"] = False
+            else:
+                v["status"] = "idle"
+        else:
+            v["status"] = "idle"
+        v["route"], v["cum"] = [], []
+
+    def _finish_phase(self, v):
+        st = v["status"]
+        job = self.jobs.get(v["job_id"]) if v["job_id"] else None
+        if st == "loading" and job:
+            job["status"] = "in_transit"
+            job.pop("transfer_from", None)
+            D = job["dropoff"]
+            self.request_route(v, D["lat"], D["lon"], "to_dropoff")
+        elif st == "unloading" and job:
+            job["status"], job["delivered_at"] = "delivered", self.sim
+            self.kpi["delivered"] += 1
+            if self.sim > job["window_end"]:
+                job["late"] = True
+                self.kpi["late"] += 1
+                self.kpi["penalties"] += PRICES["late_penalty_eur"]
+                self.add_log("Dispatch Agent", f"{job['id']} delivered LATE by {v['id']} "
+                             f"({int(self.sim - job['window_end'])} min over).", "alert")
+            else:
+                self.add_log("Dispatch Agent", f"{job['id']} delivered on time by {v['id']} at {job['dropoff']['name']}.")
+            v["job_id"], v["status"] = None, "idle"
+        elif st in ("break", "refuel"):
+            if st == "refuel":
+                v["energy"] = v["tank"] * (1.0 if v["energy_type"] == "diesel" else 0.9)
+            v["status"] = v["resume"] or "idle"
+            v["resume"] = None
+        elif st == "service":
+            v["status"], v["km_since_service"], v["health"] = "idle", 0, 100
+            v["use_mult"], v["fault"] = 1.0, None
+            self.add_log("Maintenance Agent", f"{v['id']} service complete, health 100%.")
+        elif st == "broken":
+            v["health"], v["fault"] = max(v["health"], 80), None
+            self.add_log("Maintenance Agent", f"{v['id']} repaired and back in service.")
+            if job and job["vehicle"] == v["id"]:
+                t = job["pickup"] if job["status"] == "assigned" else job["dropoff"]
+                if job["status"] != "assigned":
+                    job["status"] = "in_transit"
+                self.request_route(v, t["lat"], t["lon"], "to_pickup" if job["status"] == "assigned" else "to_dropoff")
+            else:
+                v["job_id"], v["status"] = None, "idle"
+        else:
+            v["status"] = "idle"
+
+    # ---------------- snapshot for the dashboard ----------------
+    def snapshot(self, log_after=0):
+        with self.lock:
+            vs = []
+            for v in self.vehicles.values():
+                remaining = []
+                if v["status"] in MOVING and v["route"]:
+                    idx = next((i for i, c in enumerate(v["cum"]) if c >= v["pos_km"]), len(v["route"]) - 1)
+                    pts = v["route"][idx:]
+                    step = max(1, len(pts) // 80)
+                    remaining = [[round(p[0], 5), round(p[1], 5)] for p in pts[::step]] + ([pts[-1]] if pts else [])
+                vs.append({k: v[k] for k in ("id", "type", "label", "driver", "status", "job_id", "health",
+                                             "capacity", "unit", "fault")} | {
+                    "lat": round(v["lat"], 5), "lon": round(v["lon"], 5),
+                    "energy_pct": round(100 * v["energy"] / v["tank"]),
+                    "range_km": round(self.range_km(v)),
+                    "service_due_km": round(v["service_km"] - v["km_since_service"]),
+                    "drive_today_h": round(v["drive_today"] / 60, 1),
+                    "since_break_h": round(v["drive_since_break"] / 60, 1),
+                    "odometer": round(v["odometer"]), "route": remaining,
+                    "speed_factor": round(self.speed_factor(v), 2) if v["status"] in MOVING else None})
+            k = dict(self.kpi)
+            k["on_time_pct"] = round(100 * (k["delivered"] - k["late"]) / k["delivered"]) if k["delivered"] else 100
+            k["total_cost"] = round(k["fuel_cost"] + k["energy_cost"] + k["penalties"] + k["repairs"], 2)
+            k["cost_per_km"] = round((k["fuel_cost"] + k["energy_cost"]) / k["km"], 3) if k["km"] > 1 else 0
+            for key in ("km", "diesel_l", "kwh", "fuel_cost", "energy_cost", "co2_kg"):
+                k[key] = round(k[key], 1)
+            status_counts = {}
+            for v in self.vehicles.values():
+                status_counts[v["status"]] = status_counts.get(v["status"], 0) + 1
+            return {
+                "clock": clock_str(self.sim), "sim": self.sim, "speed": self.speed, "paused": self.paused,
+                "vehicles": vs,
+                "jobs": [j | {"window_end_str": clock_str(j["window_end"])[-5:]}
+                         for j in self.jobs.values() if j["status"] != "delivered"],
+                "kpi": k, "status_counts": status_counts,
+                "weather": self.weather, "storm": self.storm,
+                "zones": [{k2: z[k2] for k2 in ("id", "lat", "lon", "radius_km", "label")} for z in self.zones],
+                "approvals": [a for a in self.approvals.values() if a["state"] == "pending"],
+                "log": [e for e in self.log if e["id"] > log_after][-120:],
+                "history": self.history, "prices": PRICES, "routing": dict(services.stats),
+            }
+
+    # ---------------- background loop ----------------
+    def run_forever(self):
+        last = time.time()
+        while True:
+            time.sleep(0.5)
+            now = time.time()
+            real_dt, last = now - last, now
+            if now - self.weather_real_at > 900:
+                self.weather_real_at = now
+                threading.Thread(target=self._refresh_weather, daemon=True).start()
+            if not self.paused:
+                self.tick(min(real_dt, 2.0) * self.speed)
+
+    def _refresh_weather(self):
+        w = services.get_weather()
+        with self.lock:
+            self.weather = w

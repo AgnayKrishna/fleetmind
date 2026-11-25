@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FleetMind · Multi-agent fleet control</title>
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo">FM</div>
+    <div>
+      <h1>FleetMind</h1>
+      <p>Multi-agent fleet control · Riga, Latvia</p>
+    </div>
+  </div>
+  <div class="hstats">
+    <div class="chip" id="clock">--</div>
+    <div class="chip" id="weather">Weather --</div>
+    <div class="chip mode" id="mode">Agents --</div>
+  </div>
+  <div class="controls">
+    <button id="pause" title="Pause / resume">❚❚</button>
+    <button class="spd" data-v="1">1×</button>
+    <button class="spd" data-v="2">2×</button>
+    <button class="spd" data-v="5">5×</button>
+  </div>
+</header>
+
+<main>
+  <section class="mapwrap">
+    <div id="map"></div>
+    <div class="legend">
+      <span><i style="background:var(--ok)"></i>Moving</span>
+      <span><i style="background:var(--load)"></i>Loading</span>
+      <span><i style="background:var(--idle)"></i>Idle</span>
+      <span><i style="background:var(--warn)"></i>Break / refuel</span>
+      <span><i style="background:var(--bad)"></i>Broken</span>
+      <span><i style="background:var(--svc)"></i>Service</span>
+    </div>
+    <div class="kpis" id="kpis"></div>
+  </section>
+
+  <aside>
+    <div class="panel">
+      <h2>Trigger an event</h2>
+      <div class="events">
+        <button data-ev="traffic"><b>🚧 Traffic jam</b><small>Route Agent reroutes</small></button>
+        <button data-ev="weather"><b>❄️ Snowstorm</b><small>Live weather + escalation</small></button>
+        <button data-ev="breakdown"><b>🔧 Breakdown</b><small>Needs manager approval</small></button>
+        <button data-ev="urgent_order"><b>⚡ Urgent order</b><small>Dispatch re-plans</small></button>
+      </div>
+    </div>
+
+    <div class="panel" id="apprPanel">
+      <h2>Waiting for your approval <span class="count" id="apprCount">0</span></h2>
+      <div id="approvals"><p class="empty">Nothing to approve. Low-risk decisions are applied automatically.</p></div>
+    </div>
+
+    <div class="panel grow">
+      <h2>Agent activity</h2>
+      <div class="agents" id="agentLegend"></div>
+      <div id="log"></div>
+    </div>
+  </aside>
+</main>
+
+<section class="bottom">
+  <div class="panel chart">
+    <h2>Energy cost and deliveries over time</h2>
+    <canvas id="costChart"></canvas>
+  </div>
+  <div class="panel fleet">
+    <h2>Fleet</h2>
+    <div class="tablewrap"><table id="fleet"><thead><tr>
+      <th>Vehicle</th><th>Type</th><th>Status</th><th>Job</th><th>Energy</th><th>Health</th><th>Driven</th><th>Service in</th>
+    </tr></thead><tbody></tbody></table></div>
+  </div>
+</section>
+
+<button id="chatBtn">💬 Ask the agents</button>
+<div id="chat" class="hidden">
+  <div class="chathead">Orchestrator chat <button id="chatClose">✕</button></div>
+  <div id="chatMsgs">
+    <div class="msg bot">Ask me about the fleet. Try "Which jobs are at risk?", "How much did fuel cost?" or "What is LV-T03 doing?"</div>
+  </div>
+  <form id="chatForm"><input id="chatIn" placeholder="Ask the fleet..." autocomplete="off"><button>Send</button></form>
+</div>
+
+<div id="offline" class="hidden">Can't reach the FleetMind backend at <code id="apiUrl"></code>.<br>Start it with <code>run.bat</code> / <code>run.sh</code>, or set the URL in <code>config.js</code>.</div>
+
+<script src="vendor/leaflet.js"></script>
+<script src="vendor/chart.umd.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
