@@ -12,6 +12,7 @@ You are working on FleetMind with nobody watching. Follow these rules exactly.
 
 ## While working
 - Work only inside this project folder.
+- Run each command on its own (no cd && chains); use the repo root as the working directory.
 - One task at a time. After each task: run the tests, then commit on `nightly` with a clear message, then tick the task `[x]` in NIGHTLY_TODO.md.
 - Test with Python (FastAPI TestClient or short scripts). Do not start long-running servers and never run share.bat or run.bat.
 - Use AGENT_MODE=rules for tests so tests never call Claude.
