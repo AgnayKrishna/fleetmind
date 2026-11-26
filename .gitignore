@@ -5,3 +5,5 @@ venv/
 .env
 backend/gtm_state.json
 backend/*.tmp
+
+nightly_logs/
