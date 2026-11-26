@@ -1,4 +1,5 @@
 @echo off
+set "PATH=%LOCALAPPDATA%\Claude-Data\claude_pzs8sxrjxfjjc\claude-code\2.1.330\9424831ad51c;%USERPROFILE%\.local\bin;%APPDATA%\npm;%LOCALAPPDATA%\Programs\claude;%ProgramFiles%\nodejs;%PATH%"
 REM FleetMind unattended Claude Code run (DAY mode). Started by Windows Task Scheduler.
 cd /d "%~dp0"
 if not exist nightly_logs mkdir nightly_logs
