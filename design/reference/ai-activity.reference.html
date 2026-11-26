@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FleetMind AI activity with reasons and undo</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+<style>body{margin:0}button{font-family:inherit;cursor:pointer}button:focus-visible{outline:2px solid #8F5400;outline-offset:2px}.item{transition:background .15s ease}.item:hover{background:#F7F7F8}@media (prefers-reduced-motion: reduce){.item{transition:none}}</style>
+</helmet>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; background: #F2F3F5; font-family: Manrope, sans-serif; color: #18191C; display: flex; flex-direction: column">
+<header style="height: 64px; flex-shrink: 0; display: flex; align-items: center; gap: 16px; padding: 0 24px; background: #FFFFFF; border-bottom: 1px solid rgba(24,25,28,0.10)">
+<div style="display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 17px"><svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#1C1408"/><path d="M8 20h10l3-5h3v5h-2" fill="none" stroke="#F2A42B" stroke-width="2.2" stroke-linejoin="round"/><circle cx="12" cy="22" r="2" fill="#F2A42B"/><circle cx="21" cy="22" r="2" fill="#F2A42B"/></svg>FleetMind</div>
+<nav aria-label="Main" style="display: flex; gap: 4px; margin-left: 12px; font-size: 14px; font-weight: 700">
+<a style="padding: 9px 14px; color: #5E6168">Map</a><a style="padding: 9px 14px; color: #5E6168">Fleet</a><a style="padding: 9px 14px; color: #5E6168">Orders</a><a aria-current="page" style="padding: 9px 14px; border-radius: 10px; color: #18191C; font-weight: 800; background: rgba(24,25,28,0.06)">AI activity</a><a style="padding: 9px 14px; color: #5E6168">Reports</a>
+</nav>
+<div style="flex-grow: 1"></div>
+<div style="width: 36px; height: 36px; border-radius: 50%; background: #FCEBCB; color: #8F5400; font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center">AK</div>
+</header>
+<div style="flex-grow: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 460px; gap: 20px; padding: 20px 24px 24px">
+<section aria-label="What the AI team did today" style="background: #FFFFFF; border-radius: 18px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; box-shadow: 0 1px 2px rgba(24,25,28,0.06), 0 8px 24px rgba(24,25,28,0.06)">
+<div style="padding: 20px 22px 14px; border-bottom: 1px solid rgba(24,25,28,0.08)">
+<h1 style="margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.3px">What your AI team did today</h1>
+<p style="margin: 6px 0 0; font-size: 14px; color: #5E6168">23 decisions made by itself, €212 saved, {{undoneCount}} undone by you. Small, low-risk changes only; anything bigger waits for you.</p>
+</div>
+<div style="overflow: hidden">
+<sc-for list="{{items}}" as="a" hint-placeholder-count="7"><div class="item" style="display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 14px 22px; border-bottom: 1px solid rgba(24,25,28,0.06); background: {{a.rowBg}}">
+<div style="width: 40px; height: 40px; border-radius: 12px; background: #F2F3F5; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px" aria-hidden="true">{{a.i}}</div>
+<div style="min-width: 0">
+<div style="font-size: 15px; font-weight: 700; text-decoration: {{a.strike}}; color: {{a.titleCol}}">{{a.title}}</div>
+<div style="font-size: 13px; color: #5E6168; margin-top: 2px">{{a.who}}, {{a.time}}. Why: {{a.why}}</div>
+<div style="font-size: 13px; font-weight: 700; margin-top: 4px; color: {{a.tagCol}}">{{a.tag}}</div>
+</div>
+<div style="display: flex; gap: 8px">
+<button onClick="{{a.open}}" style="min-height: 40px; padding: 0 14px; border-radius: 10px; border: 0; background: rgba(24,25,28,0.05); color: #18191C; font-size: 13px; font-weight: 700">Details</button>
+<button onClick="{{a.toggle}}" style="display: {{a.btnShow}}; min-height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid rgba(24,25,28,0.14); background: #FFFFFF; color: #18191C; font-size: 13px; font-weight: 800">{{a.btn}}</button>
+</div>
+</div></sc-for>
+</div>
+</section>
+<aside aria-label="Decision details" style="background: #FFFFFF; border-radius: 18px; padding: 22px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 1px 2px rgba(24,25,28,0.06), 0 8px 24px rgba(24,25,28,0.06)">
+<div style="display: flex; align-items: center; gap: 12px"><div style="width: 44px; height: 44px; border-radius: 14px; background: #FCEBCB; color: #8F5400; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px">{{sel.i}}</div><div><div style="font-size: 13px; color: #5E6168; font-weight: 700">{{sel.who}}, {{sel.time}}</div><h2 style="margin: 0; font-size: 18px; font-weight: 800">{{sel.title}}</h2></div></div>
+<div><h3 style="margin: 0 0 8px; font-size: 14px; font-weight: 800">Why</h3><p style="margin: 0; font-size: 14px; color: #44474E; line-height: 1.55">{{sel.long}}</p></div>
+<div><h3 style="margin: 0 0 8px; font-size: 14px; font-weight: 800">Options it compared</h3>
+<sc-for list="{{sel.options}}" as="o" hint-placeholder-count="3"><div style="display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 10px; margin-bottom: 6px; font-size: 14px; background: {{o.bg}}; font-weight: {{o.w}}"><span>{{o.name}}</span><span>{{o.val}}</span></div></sc-for>
+</div>
+<div><h3 style="margin: 0 0 8px; font-size: 14px; font-weight: 800">Safety checks passed</h3>
+<sc-for list="{{sel.checks}}" as="c" hint-placeholder-count="3"><div style="display: flex; gap: 8px; align-items: center; font-size: 14px; color: #44474E; margin-bottom: 6px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1F9D6B" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M5 12l5 5L19 7"/></svg>{{c}}</div></sc-for>
+</div>
+<div style="flex-grow: 1"></div>
+<div style="display: flex; gap: 10px">
+<button onClick="{{sel.toggle}}" style="display: {{sel.btnShow}}; flex: 1; min-height: 46px; border-radius: 12px; border: 0; background: #18191C; color: #FFFFFF; font-size: 15px; font-weight: 800">{{sel.btn}}</button>
+<button style="flex: 1; min-height: 46px; border-radius: 12px; border: 1px solid rgba(24,25,28,0.14); background: #FFFFFF; color: #18191C; font-size: 15px; font-weight: 700">Ask me first next time</button>
+</div>
+</aside>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+const A = [
+  { id:'fuel', i:'L', who:'Leo', time:'12:08', title:'Moved LV-V12 fuel stop to Circle K Jugla', why:'9 c/L cheaper and on the route', tag:'Saved €11', undo:'LV-V12 goes back to Neste Brivibas', can:true,
+    long:'Ilze in LV-V12 had 18% fuel. Her planned stop at Neste Brivibas was €2.17/L. Circle K Jugla is €2.08/L, 400 m off her route, and adds under 2 minutes.',
+    options:[{name:'Circle K Jugla (chosen)',val:'€2.08/L, +2 min'},{name:'Neste Brivibas (was planned)',val:'€2.17/L, +0 min'},{name:'Viada Purvciems',val:'€2.11/L, +6 min'}],
+    checks:['Low risk: cost change under €50','Driver keeps 2 h 05 drive time','Delivery stays inside its time window'] },
+  { id:'route', i:'R', who:'Ruta', time:'11:52', title:'Rerouted LV-T01 around roadworks on the A8', why:'avoids a 20 min queue at Olaine', tag:'Arrives on time', undo:'LV-T01 goes back to the A8 route', can:true,
+    long:'Traffic showed a 20 minute queue at the Olaine roadworks. The P101 detour is 3 km longer but arrives 14 minutes earlier, and the bridge on it fits the truck.',
+    options:[{name:'P101 detour (chosen)',val:'12:35, +3 km'},{name:'A8 as planned',val:'12:49, 0 km'}],
+    checks:['Low risk: arrival improves','Bridge and weight limits fit LV-T01','No toll added'] },
+  { id:'notify', i:'D', who:'Dina', time:'11:40', title:'Told HomeBox that ORD-2420 is 12 min late', why:'their contract asks for a warning over 10 min', tag:'Message sent from the template', undo:'', can:false,
+    long:'LV-V12 hit traffic on Brivibas iela. HomeBox asks for a warning when a delivery will be more than 10 minutes late, so Dina sent the approved template.',
+    options:[{name:'Send the late notice (chosen)',val:'12:50 new time'}],
+    checks:['Uses your approved template only','Goes to the contact on the order'] },
+  { id:'charge', i:'R', who:'Ruta', time:'11:15', title:'Added a 20 min charge stop at Kekava for LV-E02', why:'battery would reach Bauska at 9%', tag:'Arrives with 31%', undo:'LV-E02 drives straight to Bauska', can:true,
+    long:'Marta in LV-E02 would have arrived at Bauska with 9% battery, under your 15% limit. A 20 minute stop at Kekava fits before the 14:00 pickup.',
+    options:[{name:'Charge at Kekava (chosen)',val:'31% on arrival'},{name:'No stop',val:'9% on arrival'}],
+    checks:['Keeps battery above your 15% limit','Pickup at 14:00 still on time'] },
+  { id:'service', i:'M', who:'Max', time:'10:30', title:'Booked LV-T05 for a tyre check on Saturday', why:'pressure drops 0.2 bar a day', tag:'Truck is free that day', undo:'Cancel the Saturday booking', can:true,
+    long:'The left rear tyre of LV-T05 has lost about 0.2 bar a day for 4 days. Saturday is the first free day, and the booking costs nothing to cancel.',
+    options:[{name:'Saturday 09:00 (chosen)',val:'no orders lost'},{name:'Tomorrow',val:'moves 2 orders'}],
+    checks:['No orders affected','Free to cancel until Friday 18:00'] }
+];
+class Component extends DCLogic {
+renderVals() {
+  const st = this.state || {};
+  const undone = st.undone || {};
+  const selId = st.sel || 'fuel';
+  const flip = (id) => () => this.setState({ undone: { ...undone, [id]: !undone[id] } });
+  const view = (a) => {
+    const u = !!undone[a.id];
+    return { ...a,
+      rowBg: a.id === selId ? '#FCF6EA' : 'transparent',
+      strike: u ? 'line-through' : 'none', titleCol: u ? '#8A8F98' : '#18191C',
+      tag: u ? 'Undone by you: ' + a.undo : a.tag, tagCol: u ? '#5E6168' : (a.can ? '#13684A' : '#44474E'),
+      btnShow: a.can ? 'block' : 'none', btn: u ? 'Redo' : 'Undo',
+      toggle: flip(a.id), open: () => this.setState({ sel: a.id }) };
+  };
+  const items = A.map(view);
+  const sel = items.find(x => x.id === selId);
+  return { items, sel, undoneCount: Object.values(undone).filter(Boolean).length };
+}
+}
+</script>
+</body>
+</html>

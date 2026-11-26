@@ -39,7 +39,18 @@ https://claude.ai/artifact/PyTvJwL8Be7j9UcfNCw8co
 | status watch (needs watching) | #7C5CE0 | #9C82FF |
 | status act (act now) | #D93A3A | #FF5C5C |
 
-Amber is the brand, so "needs watching" is violet, never amber.
+Amber is the brand, so "needs watching" is violet, never amber. Amber never shows a status.
+
+## Vehicle status colours (everywhere: map halos, table chips, filters)
+| Status | Dot | Chip fill | Chip text | When |
+|---|---|---|---|---|
+| On route | #1F9D6B | #DDF2E8 | #13684A | driving and on schedule |
+| Loading | #2F7FD8 | #E1EDFB | #1D5FAE | at a pickup or drop-off |
+| Parked | #8A8F98 | #ECEDEF | #44474E | free, on a break or at the depot |
+| Delay risk | #7C5CE0 | #ECE7FC | #5B3FC4 | may be late, an AI teammate is on it |
+| Act now | #D93A3A | #FBE3E3 | #B42828 | breakdown, accident, missed slot |
+| No signal | #5E6168 | none, 1px dashed #8A8F98 border | #44474E | tracker silent 10 min or more |
+Reference: `design/reference/status-and-lite-rules.reference.html`. Dark mode uses the same hues, lighter (as in the token table).
 
 ## Vehicles on the map
 - Soft 3D top-down icons (exact SVG symbols `truck` and `van` in the reference file). Keep them as they are.
@@ -62,3 +73,15 @@ Amber is the brand, so "needs watching" is violet, never amber.
 - One amber primary button per panel. Secondary buttons use the chip fill.
 - Badges: soft tint background + darker text of the same hue, sentence case.
 - Copy: sentence case, plain verbs ("Send LV-T03 to collect the load"), no ALL CAPS labels.
+
+## Lite mode (automatic solid panels)
+Reference: `design/reference/lite-mode.reference.html` (1366x768 laptop).
+- Switches on by itself when any is true: screen width <= 1440 px or height <= 800 px; `navigator.hardwareConcurrency` <= 4 or `navigator.deviceMemory` <= 4; map below 30 fps for 3 s; `prefers-reduced-transparency` or `prefers-reduced-motion`.
+- Lite mode: solid white panels with a 1px border (no backdrop blur), no trails or gliding animations (jump to new positions), AI team folds into a 56px icon rail with status dots, "Needs you" shows the top 2 with "Show N more", smaller bottom sheet.
+- A "Lite mode" toggle in the top bar overrides the automatic choice; remember it in localStorage (wrapped in try/catch).
+
+## Other screens (top nav: Map, Fleet, Orders, AI activity, Reports)
+- **Fleet table** (`fleet-table.reference.html`): one row per vehicle: plate with vehicle-colour swatch, driver, status chip, where, next stop + ETA, load bar, fuel/charge (red under 20%), drive time left, AI note. Status filter pills with counts (pressed = dark fill), search with "/" shortcut, sortable columns, Export CSV. Must stay fast with 100+ vehicles (virtualise rows).
+- **Orders board** (`orders.reference.html`): columns New, Assigned, In progress, Delivered, Problem. Cards: order id, price, route, customer, load, time window, vehicle and driver. New cards show the AI suggestion with a one-click amber "Assign" button. Problem cards get a 2px red border and the proposed fix. Delivered cards show who signed + photo, and "Send invoice". Amber "New order" button in the top bar.
+- **AI activity** (`ai-activity.reference.html`): today's list of decisions the AI made by itself: who, what, when, "Why: ...", the result (saved EUR / arrives on time). Each reversible one has Undo (crossed out after, with what happens instead) and Redo. Things that cannot be reversed (messages already sent) have no Undo. Detail panel: the full reason, the options compared, the safety checks passed, Undo, and "Ask me first next time" (turns that kind of decision into an approval). Undo must really revert the action in the backend and be logged.
+- **Empty, offline and error states** (`states.reference.html`): no vehicles yet = "Connect your first truck" with three ways (tracker, existing GPS system, driver phone) and an amber button. Offline = dark banner "You're offline. Positions are from HH:MM.", greyed map, actions queue and show "N changes waiting to send", "Try to reconnect". A service fails = never blank; say what fell back and what to watch (TomTom -> HERE -> basic routes; AI down = rules keep running, nothing new auto-approved; tracker silent = No signal + ask the driver on Telegram), with a retry button.

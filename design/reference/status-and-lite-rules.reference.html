@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FleetMind status colours and lite mode rules</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 1280px; height: 640px; box-sizing: border-box; padding: 48px; background: #F2F3F5; font-family: Manrope, sans-serif; color: #18191C; display: grid; grid-template-columns: 1.2fr 1fr; gap: 28px">
+<section style="background: #FFFFFF; border-radius: 22px; padding: 24px">
+<h2 style="margin: 0 0 6px; font-size: 20px; font-weight: 800">Vehicle status colours</h2>
+<p style="margin: 0 0 18px; font-size: 14px; color: #5E6168">Amber is only the brand, the main button and the electric truck. It never means a status.</p>
+<div style="display: flex; flex-direction: column; gap: 12px">
+<sc-for list="{{statuses}}" as="s" hint-placeholder-count="6"><div style="display: grid; grid-template-columns: 150px 90px 1fr; gap: 14px; align-items: center">
+<span style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; font-size: 13px; font-weight: 700; background: {{s.bg}}; color: {{s.fg}}; border: {{s.border}}; justify-self: start"><span style="width: 8px; height: 8px; border-radius: 50%; background: {{s.dot}}"></span>{{s.label}}</span>
+<span style="font-size: 12px; color: #5E6168">{{s.dot}}</span>
+<span style="font-size: 14px; color: #44474E">{{s.when}}</span>
+</div></sc-for>
+</div>
+</section>
+<section style="background: #FFFFFF; border-radius: 22px; padding: 24px">
+<h2 style="margin: 0 0 6px; font-size: 20px; font-weight: 800">Lite mode turns on by itself</h2>
+<p style="margin: 0 0 18px; font-size: 14px; color: #5E6168">Solid panels, no blur, fewer moving parts. Any one of these switches it on:</p>
+<ul style="margin: 0; padding-left: 20px; font-size: 15px; line-height: 1.7">
+<li>Screen 1440 px wide or less, or 800 px tall or less</li>
+<li>4 CPU cores or fewer, or 4 GB memory or less</li>
+<li>The map drops below 30 frames a second for 3 seconds</li>
+<li>Windows "transparency effects" or reduced motion is off / on</li>
+</ul>
+<p style="margin: 18px 0 0; font-size: 14px; color: #44474E">The user can still switch it with the Lite mode toggle, and the choice is remembered. In lite mode the AI team folds into an icon rail and "Needs you" shows the top 2.</p>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":640}}'>
+class Component extends DCLogic {
+renderVals() {
+  return { statuses: [
+    { label:'On route',   dot:'#1F9D6B', bg:'#DDF2E8', fg:'#13684A', border:'0', when:'Driving and on schedule' },
+    { label:'Loading',    dot:'#2F7FD8', bg:'#E1EDFB', fg:'#1D5FAE', border:'0', when:'At a pickup or drop-off' },
+    { label:'Parked',     dot:'#8A8F98', bg:'#ECEDEF', fg:'#44474E', border:'0', when:'Free, on a break or at the depot' },
+    { label:'Delay risk', dot:'#7C5CE0', bg:'#ECE7FC', fg:'#5B3FC4', border:'0', when:'May be late; an AI teammate is on it' },
+    { label:'Act now',    dot:'#D93A3A', bg:'#FBE3E3', fg:'#B42828', border:'0', when:'Breakdown, accident or a missed slot' },
+    { label:'No signal',  dot:'#5E6168', bg:'transparent', fg:'#44474E', border:'1px dashed #8A8F98', when:'Tracker silent for 10 minutes or more' }
+  ] };
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FleetMind empty, offline and error states</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+<style>body{margin:0}button{font-family:inherit;cursor:pointer}</style>
+</helmet>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; padding: 40px; background: #F2F3F5; font-family: Manrope, sans-serif; color: #18191C; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px">
+
+<section aria-label="No trucks connected yet" style="background: #FFFFFF; border-radius: 22px; overflow: hidden; display: flex; flex-direction: column">
+<div style="height: 260px; background: #ECEDEF; position: relative">
+<svg width="100%" height="260" viewBox="0 0 440 260" aria-hidden="true"><g stroke="#FFFFFF" stroke-width="10" fill="none" stroke-linecap="round"><path d="M0 130 H440"/><path d="M150 0 V260"/><path d="M0 40 L440 230"/></g><g transform="translate(220 130)"><circle r="34" fill="none" stroke="#8A8F98" stroke-width="2" stroke-dasharray="5 5"/><rect x="-20" y="-9" width="40" height="18" rx="4" fill="none" stroke="#8A8F98" stroke-width="2" stroke-dasharray="4 3"/></g></svg>
+</div>
+<div style="padding: 24px; display: flex; flex-direction: column; gap: 14px; flex-grow: 1">
+<h2 style="margin: 0; font-size: 22px; font-weight: 800">Connect your first truck</h2>
+<p style="margin: 0; font-size: 15px; color: #44474E; line-height: 1.5">Your map fills in as soon as one vehicle sends its position. Pick the way that fits your fleet:</p>
+<div style="display: flex; flex-direction: column; gap: 8px; font-size: 14px">
+<div style="padding: 12px; border-radius: 12px; background: #F2F3F5"><b>Tracker in the truck</b><br><span style="color: #5E6168">Teltonika or similar, plugs into the FMS port</span></div>
+<div style="padding: 12px; border-radius: 12px; background: #F2F3F5"><b>Your current GPS system</b><br><span style="color: #5E6168">Mapon, or the truck maker's own portal</span></div>
+<div style="padding: 12px; border-radius: 12px; background: #F2F3F5"><b>Driver's phone</b><br><span style="color: #5E6168">Free app, ready in 5 minutes</span></div>
+</div>
+<div style="flex-grow: 1"></div>
+<button style="min-height: 48px; border-radius: 14px; border: 0; background: #F2A42B; color: #1C1408; font-size: 16px; font-weight: 800">Connect a truck</button>
+</div>
+</section>
+
+<section aria-label="Offline" style="background: #FFFFFF; border-radius: 22px; overflow: hidden; display: flex; flex-direction: column">
+<div role="status" style="display: flex; align-items: center; gap: 10px; padding: 14px 18px; background: #18191C; color: #F1EFEA; font-size: 14px; font-weight: 700">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F1EFEA" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2 2l20 20"/><path d="M8.5 16.5a5 5 0 0 1 7 0"/><path d="M5 12.9a10 10 0 0 1 5.2-2.8"/><path d="M19 12.9a10 10 0 0 0-2.3-1.6"/><circle cx="12" cy="20" r="1"/></svg>
+You're offline. Positions are from 12:04.</div>
+<div style="height: 222px; background: #ECEDEF; position: relative; filter: grayscale(1); opacity: 0.6">
+<svg width="100%" height="222" viewBox="0 0 440 222" aria-hidden="true"><g stroke="#FFFFFF" stroke-width="10" fill="none"><path d="M0 110 H440"/><path d="M300 0 V222"/></g><rect x="120" y="102" width="30" height="14" rx="3" fill="#2E3035"/><rect x="290" y="60" width="30" height="14" rx="3" fill="#2E3035"/><rect x="200" y="160" width="24" height="12" rx="5" fill="#F7F7F5" stroke="#8A8F98"/></svg>
+</div>
+<div style="padding: 24px; display: flex; flex-direction: column; gap: 14px; flex-grow: 1">
+<h2 style="margin: 0; font-size: 22px; font-weight: 800">Working offline</h2>
+<p style="margin: 0; font-size: 15px; color: #44474E; line-height: 1.5">You can keep approving and assigning. Your changes send as soon as the connection is back. The AI team keeps working on the server.</p>
+<div style="padding: 12px; border-radius: 12px; background: #F2F3F5; font-size: 14px; display: flex; justify-content: space-between"><span><b>2 changes</b> waiting to send</span><span style="color: #5E6168">Assign LV-T11, Approve LV-T03</span></div>
+<div style="flex-grow: 1"></div>
+<button style="min-height: 48px; border-radius: 14px; border: 1px solid rgba(24,25,28,0.12); background: #FFFFFF; color: #18191C; font-size: 16px; font-weight: 800">Try to reconnect</button>
+</div>
+</section>
+
+<section aria-label="Service problem" style="background: #FFFFFF; border-radius: 22px; overflow: hidden; display: flex; flex-direction: column; position: relative">
+<div style="height: 260px; background: #ECEDEF; position: relative">
+<svg width="100%" height="260" viewBox="0 0 440 260" aria-hidden="true"><g stroke="#FFFFFF" stroke-width="10" fill="none"><path d="M0 150 H440"/><path d="M110 0 V260"/></g><path d="M110 150 L330 60" stroke="#F2A42B" stroke-width="5" stroke-dasharray="10 8" fill="none" stroke-linecap="round"/><rect x="96" y="143" width="30" height="14" rx="3" fill="#2E3035"/><circle cx="330" cy="60" r="7" fill="#18191C"/></svg>
+<div role="alert" style="position: absolute; left: 16px; right: 16px; bottom: 16px; background: #FFFFFF; border-radius: 14px; padding: 14px; box-shadow: 0 8px 24px rgba(24,25,28,0.16); display: flex; gap: 12px; align-items: flex-start">
+<span style="width: 10px; height: 10px; border-radius: 50%; background: #7C5CE0; margin-top: 5px; flex-shrink: 0"></span>
+<div style="font-size: 14px"><b>Truck routing is unavailable</b><br><span style="color: #44474E">TomTom isn't responding, so routes are straight-line estimates for now. Check bridge heights before sending trucks.</span></div>
+</div>
+</div>
+<div style="padding: 24px; display: flex; flex-direction: column; gap: 14px; flex-grow: 1">
+<h2 style="margin: 0; font-size: 22px; font-weight: 800">When a service fails</h2>
+<p style="margin: 0; font-size: 15px; color: #44474E; line-height: 1.5">The screen never goes blank. FleetMind falls back to the next source and says what changed and what to watch out for:</p>
+<div style="display: flex; flex-direction: column; gap: 8px; font-size: 14px">
+<div style="padding: 12px; border-radius: 12px; background: #F2F3F5"><b>Routing:</b> TomTom, then HERE, then basic routes</div>
+<div style="padding: 12px; border-radius: 12px; background: #F2F3F5"><b>AI team down:</b> safe rules keep running, nothing new is auto-approved</div>
+<div style="padding: 12px; border-radius: 12px; background: #F2F3F5"><b>A tracker goes silent:</b> marked No signal, driver asked on Telegram</div>
+</div>
+<div style="flex-grow: 1"></div>
+<button style="min-height: 48px; border-radius: 14px; border: 1px solid rgba(24,25,28,0.12); background: #FFFFFF; color: #18191C; font-size: 16px; font-weight: 800">Retry TomTom now</button>
+</div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic { renderVals() { return {}; } }
+</script>
+</body>
+</html>
