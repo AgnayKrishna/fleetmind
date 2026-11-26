@@ -26,4 +26,5 @@ Newest at the bottom.
 
 **Questions**
 - "Low energy" items only have a **Show** button because no API can send a vehicle to refuel early. Do you want a "Refuel now" action (new backend event)?
+- **Push failed:** `git push -u origin nightly` needed approval and was blocked, so the `nightly` branch exists only on this machine. Please push it yourself.
 - Should the scheduled DAY run be allowed to run `.venv\Scripts\python.exe` and `node` without approval? Otherwise the tests can never run unattended.
