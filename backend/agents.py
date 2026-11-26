@@ -195,12 +195,7 @@ class AgentTeam:
 
     # ================= events =================
     def _target_of(self, v):
-        job = self.w.jobs.get(v["job_id"]) if v["job_id"] else None
-        if v["status"] == "to_pickup" and job:
-            return job.get("transfer_from") or job["pickup"]
-        if v["status"] == "to_dropoff" and job:
-            return job["dropoff"]
-        return loc(v["home"])
+        return self.w.target_of(v) or loc(v["home"])
 
     def _traffic(self, vehicle_id, source):
         w = self.w

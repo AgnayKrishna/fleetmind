@@ -14,6 +14,6 @@ The owner and Claude plan this list each evening.
 
 ## Daytime (DAY mode, 1-2 tasks only)
 
-- [ ] **"Refuel now" / "Charge now" button** on low-energy items in the "Needs your attention" bar. Diesel vehicles: suggest the cheapest fuel station near the route (Leo's logic, low-risk, auto-apply rules stay the same) and add it as a stop after one tap. Electric vehicles: same with the nearest charger. Show the price or charge time on the button. Add a test.
+- [x] **"Refuel now" / "Charge now" button** on low-energy items in the "Needs your attention" bar. Diesel vehicles: suggest the cheapest fuel station near the route (Leo's logic, low-risk, auto-apply rules stay the same) and add it as a stop after one tap. Electric vehicles: same with the nearest charger. Show the price or charge time on the button. Add a test.
 - [x] **"Needs your attention" list** at the top of the dashboard: pending approvals, late jobs, broken vehicles and low fuel, each with one clear button.
 - [x] **Agent log filter polish:** keep the clicked agent tag highlighted and show an "All agents" tag first.

@@ -2,10 +2,10 @@ const params = new URLSearchParams(location.search);
 const API = (params.get("api") || window.FLEET_API_URL || "").replace(/\/$/, "");
 let KEY = params.get("key") || sessionStorage.getItem("fleetKey") || "";
 if (KEY) sessionStorage.setItem("fleetKey", KEY);
-const STATUS_COLOR = { to_pickup: "var(--ok)", to_dropoff: "var(--ok)", to_depot: "var(--ok)", routing: "var(--accent)",
+const STATUS_COLOR = { to_pickup: "var(--ok)", to_dropoff: "var(--ok)", to_depot: "var(--ok)", to_fuel: "var(--warn)", routing: "var(--accent)",
   loading: "var(--load)", unloading: "var(--load)", idle: "var(--idle)", break: "var(--warn)", refuel: "var(--warn)",
   broken: "var(--bad)", service: "var(--svc)" };
-const STATUS_TEXT = { to_pickup: "to pickup", to_dropoff: "delivering", to_depot: "to depot", routing: "planning route",
+const STATUS_TEXT = { to_pickup: "to pickup", to_dropoff: "delivering", to_depot: "to depot", to_fuel: "to fuel/charger", routing: "planning route",
   loading: "loading", unloading: "unloading", idle: "idle", break: "driver break", refuel: "refuel/charge",
   broken: "BROKEN", service: "in service" };
 const AGENT_COLOR = { "Orchestrator": "var(--orch)", "Route Agent": "var(--route)", "Dispatch Agent": "var(--disp)",
@@ -162,7 +162,7 @@ function drawHeader(s) {
 
 function drawKpis(s) {
   const k = s.kpi, c = s.status_counts;
-  const moving = (c.to_pickup || 0) + (c.to_dropoff || 0) + (c.to_depot || 0);
+  const moving = (c.to_pickup || 0) + (c.to_dropoff || 0) + (c.to_depot || 0) + (c.to_fuel || 0);
   const items = [
     [moving + "/" + s.vehicles.length, "vehicles on the road"], [k.delivered, "delivered"],
     [k.on_time_pct + "%", "on time"], [Math.round(k.km).toLocaleString(), "km driven"],
@@ -219,9 +219,15 @@ function attentionItems(s) {
     if (t && t.cargo && !t.on_time)
       items.push({ c: "var(--bad)", kind: "Late", text: `${v.job_id} on ${v.id}${t.late_min ? ` · ${t.late_min} min` : ""}`,
         btn: "Show", act: "vehicle", id: v.id });
-    if (v.energy_pct < LOW_ENERGY_PCT && !["refuel", "broken", "service"].includes(v.status))
+    if (v.energy_pct < LOW_ENERGY_PCT && !v.fuel_stop && !["refuel", "broken", "service"].includes(v.status)) {
+      // The Fuel & Cost Agent's pick: cheapest diesel near the route, or the nearest charger for EVs.
+      const st = v.energy_stop, ev = v.unit === "kWh";
+      const btn = !st ? "Show" : ev ? `Charge now · ${st.minutes} min` : `Refuel now · €${st.price_eur_l.toFixed(2)}/L`;
       items.push({ c: "var(--fuel)", kind: "Low energy", text: `${v.id} · ${v.energy_pct}% (${v.range_km} km)`,
-        btn: "Show", act: "vehicle", id: v.id });
+        btn, act: st ? "energy" : "vehicle", id: v.id,
+        title: st ? `${st.name} · +${st.detour_km} km detour` + (ev ? ` · ${st.kw} kW, ~${st.kwh} kWh, €${st.cost_eur}`
+          : ` · ~${st.litres} L, €${st.cost_eur}` + (st.saving_eur > 0 ? `, saves €${st.saving_eur}` : "")) : "" });
+    }
   }
   for (const j of s.jobs)
     if (j.status === "pending" && j.window_end < s.sim)
@@ -238,7 +244,7 @@ function drawAttention(s) {
   attnKey = key;
   $("#attnList").innerHTML = n ? items.map(i => `<div class="attn-item" style="--c:${i.c}">
       <span><b>${esc(i.kind)}</b> ${esc(i.text)}</span>
-      <button data-act="${i.act}" data-id="${esc(i.id)}">${esc(i.btn)}</button></div>`).join("")
+      <button data-act="${i.act}" data-id="${esc(i.id)}"${i.title ? ` title="${esc(i.title)}"` : ""}>${esc(i.btn)}</button></div>`).join("")
     : `<p class="empty">All clear. Nothing needs you right now.</p>`;
 }
 
@@ -248,10 +254,15 @@ function focusVehicle(id) {
   if (v) { map.panTo([v.lat, v.lon]); markers[id]?.openPopup(); }
 }
 
-$("#attnList").addEventListener("click", e => {
+$("#attnList").addEventListener("click", async e => {
   const b = e.target.closest("button[data-act]"); if (!b) return;
   const id = b.dataset.id;
-  if (b.dataset.act === "approval") {
+  if (b.dataset.act === "energy") {
+    b.disabled = true; b.textContent = "Adding stop…";
+    try { await api(`/api/vehicles/${encodeURIComponent(id)}/energy_stop`, {}); }
+    catch { b.textContent = "Couldn't add stop"; }
+    attnKey = ""; poll();
+  } else if (b.dataset.act === "approval") {
     showTab("ops");
     const card = [...document.querySelectorAll("#approvals .appr")].find(c => c.dataset.id === id);
     if (card) { card.scrollIntoView({ block: "nearest", behavior: "smooth" });

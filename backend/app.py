@@ -111,6 +111,16 @@ def approve(aid: str, a: ApprovalIn):
     return team.resolve(aid, a.option_id, a.approve)
 
 
+class EnergyStopIn(BaseModel):
+    station_id: str | None = None   # default: the station the Fuel & Cost Agent suggests
+
+
+@app.post("/api/vehicles/{vid}/energy_stop")
+def energy_stop(vid: str, e: EnergyStopIn | None = None):
+    r = world.add_energy_stop(vid, e.station_id if e else None)
+    return r if r["ok"] else JSONResponse(r, status_code=409)
+
+
 @app.post("/api/chat")
 def chat(c: ChatIn):
     return team.chat(c.message[:500])

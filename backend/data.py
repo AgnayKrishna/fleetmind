@@ -62,6 +62,56 @@ PRICES = {
 }
 CO2 = {"diesel_kg_l": 2.68, "electric_kg_kwh": 0.10}
 
+# Demo fuel stations and chargers along the main Latvian freight roads. Locations are approximate
+# and prices are estimates around the national average above, so the Fuel & Cost Agent (Leo) has a
+# realistic spread to choose from. (id, name, lat, lon, diesel EUR/L)
+FUEL_STATIONS = [
+    ("F01", "Circle K Jugla, Riga", 56.983, 24.233, 1.99),
+    ("F02", "Neste Brivibas iela, Riga", 56.970, 24.160, 2.08),
+    ("F03", "Circle K Milgravis, Riga", 57.010, 24.090, 2.09),
+    ("F04", "Viada Marupe", 56.905, 24.000, 2.04),
+    ("F05", "Virsi Kekava", 56.835, 24.225, 2.02),
+    ("F06", "Viada Salaspils", 56.865, 24.340, 2.03),
+    ("F07", "Circle K Olaine", 56.790, 23.945, 2.05),
+    ("F08", "Neste Jelgava", 56.655, 23.735, 2.01),
+    ("F09", "Virsi Ogre", 56.820, 24.590, 2.04),
+    ("F10", "Circle K Sigulda", 57.150, 24.840, 2.07),
+    ("F11", "Virsi Cesis", 57.305, 25.260, 2.06),
+    ("F12", "Neste Valmiera", 57.535, 25.410, 2.03),
+    ("F13", "Virsi Tukums", 56.965, 23.170, 2.00),
+    ("F14", "Virsi Dobele", 56.625, 23.290, 2.02),
+    ("F15", "Circle K Bauska", 56.410, 24.200, 2.06),
+    ("F16", "Neste Aizkraukle", 56.605, 25.240, 2.05),
+    ("F17", "Viada Jekabpils", 56.500, 25.850, 2.02),
+    ("F18", "Neste Daugavpils", 55.880, 26.520, 1.98),
+    ("F19", "Circle K Rezekne", 56.505, 27.320, 2.04),
+    ("F20", "Virsi Liepaja", 56.520, 21.020, 2.01),
+    ("F21", "Neste Ventspils", 57.390, 21.580, 2.03),
+    ("F22", "Circle K Adazi", 57.070, 24.320, 2.05),
+    ("F23", "Circle K Limbazi", 57.510, 24.700, 2.06),
+    ("F24", "Neste Saulkrasti", 57.260, 24.420, 2.04),
+]
+
+# (id, name, lat, lon, charger kW, EUR/kWh)
+CHARGERS = [
+    ("C01", "FleetMind depot chargers, Granita iela", 56.917, 24.228, 150, 0.30),
+    ("C02", "Ignitis ON Jugla, Riga", 56.983, 24.236, 150, 0.45),
+    ("C03", "Elektrum Lielirbes iela, Riga", 56.930, 24.035, 150, 0.42),
+    ("C04", "Ignitis ON Freeport, Riga", 56.995, 24.080, 150, 0.45),
+    ("C05", "Ignitis ON Kekava", 56.830, 24.225, 150, 0.45),
+    ("C06", "Elektrum Jelgava", 56.651, 23.725, 50, 0.42),
+    ("C07", "Ignitis ON Jurmala", 56.968, 23.790, 150, 0.45),
+    ("C08", "Elektrum Ogre", 56.818, 24.600, 50, 0.42),
+    ("C09", "Elektrum Sigulda", 57.152, 24.850, 50, 0.42),
+    ("C10", "Ignitis ON Valmiera", 57.538, 25.420, 150, 0.45),
+    ("C11", "Elektrum Tukums", 56.967, 23.160, 50, 0.42),
+    ("C12", "Elektrum Jekabpils", 56.500, 25.860, 50, 0.42),
+    ("C13", "Elektrum Daugavpils", 55.875, 26.530, 50, 0.42),
+    ("C14", "Elektrum Liepaja", 56.525, 21.015, 50, 0.42),
+    ("C15", "Elektrum Ventspils", 57.392, 21.570, 50, 0.42),
+    ("C16", "Ignitis ON Bauska", 56.408, 24.190, 150, 0.45),
+]
+
 DRIVER_NAMES = ["Janis Ozols", "Andris Berzins", "Maris Kalnins", "Edgars Liepa", "Raivis Krumins",
                 "Kristaps Zarins", "Arturs Vitols", "Toms Eglitis", "Martins Lacis", "Ilze Kalnina",
                 "Laura Ozolina", "Roberts Sproģis", "Davis Rozitis", "Aivars Balodis", "Gints Pumpurs",

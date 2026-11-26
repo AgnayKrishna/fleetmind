@@ -6,15 +6,19 @@ from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 
 from . import services
-from .data import (CARGO, CO2, DEPOTS, DRIVER_NAMES, FLEET_MIX, LOCATIONS, PRICES, VEHICLE_TYPES,
-                   loc, random_pickup)
+from .data import (CARGO, CHARGERS, CO2, DEPOTS, DRIVER_NAMES, FLEET_MIX, FUEL_STATIONS, LOCATIONS, PRICES,
+                   VEHICLE_TYPES, loc, random_pickup)
 
-MOVING = ("to_pickup", "to_dropoff", "to_depot")
+MOVING = ("to_pickup", "to_dropoff", "to_depot", "to_fuel")
 TIMED = ("loading", "unloading", "break", "refuel", "service", "broken")
 BREAK_AFTER_MIN = 270      # EU rule: 4.5 h driving, then a 45 min break
 BREAK_MIN = 45
 DAILY_DRIVE_MAX = 540      # 9 h per day
 RIGA = (56.95, 24.11)
+LOW_ENERGY_PCT = 20        # dashboard offers "Refuel now" / "Charge now" below this; auto-refuel stays at 12%
+NEAR_ROUTE_KM = 15         # a station this close to the remaining route counts as "on the way"
+DIESEL_FILL_MIN = 20
+EV_CHARGE_TO = 0.9
 
 
 def clock_str(sim_min):
@@ -173,7 +177,7 @@ class World:
             bump = None
             if v["status"] == "idle":
                 pass
-            elif allow_bump and v["status"] in ("to_pickup", "routing") and v["job_id"]:
+            elif allow_bump and v["status"] in ("to_pickup", "routing") and v["job_id"] and not v.get("fuel_stop"):
                 other = self.jobs.get(v["job_id"])
                 if not other or other["status"] != "assigned" or other["priority"] == "urgent":
                     continue
@@ -223,6 +227,116 @@ class World:
         else:
             target = job["pickup"]
         self.request_route(v, target["lat"], target["lon"], "to_pickup")
+
+    def target_of(self, v, st=None):
+        """Where a vehicle is heading for status st (default: its current one). None = nowhere."""
+        st = st or (v["after_route"] if v["status"] == "routing" else v["status"])
+        if st == "to_fuel" and v.get("fuel_stop"):
+            return v["fuel_stop"]["station"]
+        job = self.jobs.get(v["job_id"]) if v["job_id"] else None
+        if st == "to_pickup" and job:
+            return job.get("transfer_from") or job["pickup"]
+        if st == "to_dropoff" and job:
+            return job["dropoff"]
+        if st == "to_depot":
+            return loc(v["home"])
+        return None
+
+    # ---------------- fuel and charging stops (Fuel & Cost Agent) ----------------
+    def _route_ahead(self, v, target):
+        """Sample points of the road still to drive, used to find stations on the way."""
+        if v["status"] in MOVING and v["route"]:
+            idx = next((i for i, c in enumerate(v["cum"]) if c >= v["pos_km"]), len(v["route"]) - 1)
+            pts = v["route"][idx:]
+            return pts[::max(1, len(pts) // 40)] + pts[-1:]
+        if target:   # no road geometry yet: straight line to the target
+            return [(v["lat"] + (target["lat"] - v["lat"]) * f / 8, v["lon"] + (target["lon"] - v["lon"]) * f / 8)
+                    for f in range(9)]
+        return [(v["lat"], v["lon"])]
+
+    def energy_stop_options(self, v, limit=3):
+        """Best stations for a refuel (diesel: cheapest total incl. detour) or charge (EV: nearest by
+        detour plus charge time). Only stations the vehicle can still reach are offered."""
+        diesel = v["energy_type"] == "diesel"
+        use = VEHICLE_TYPES[v["type"]]["use_per_km"] * v["use_mult"]
+        rng_km = self.range_km(v)
+        pts = self._route_ahead(v, self.target_of(v))
+        out = []
+        for row in (FUEL_STATIONS if diesel else CHARGERS):
+            sid, name, lat, lon = row[:4]
+            to_km = services.haversine(v["lat"], v["lon"], lat, lon) * 1.25
+            if to_km > rng_km * 0.95:
+                continue
+            off_km = min(services.haversine(p[0], p[1], lat, lon) for p in pts) * 1.25
+            detour_km = round(2 * off_km, 1)
+            st = {"id": sid, "name": name, "lat": lat, "lon": lon, "detour_km": detour_km,
+                  "near_route": off_km <= NEAR_ROUTE_KM}
+            if diesel:
+                price = row[4]
+                litres = v["tank"] - max(0.0, v["energy"] - to_km * use)
+                detour_eur = detour_km * use * price
+                st |= {"price_eur_l": price, "litres": round(litres),
+                       "cost_eur": round(litres * price + detour_eur, 2),
+                       "saving_eur": round(litres * (PRICES["diesel_eur_l"] - price) - detour_eur, 2),
+                       "minutes": DIESEL_FILL_MIN}
+                st["score"] = st["cost_eur"]
+            else:
+                kw, price = row[4], row[5]
+                kwh = max(0.0, v["tank"] * EV_CHARGE_TO - max(0.0, v["energy"] - to_km * use))
+                charge_min = round(kwh / kw * 60 * 1.15) + 5      # charge curve tapers, plus plug-in time
+                st |= {"kw": kw, "price_eur_kwh": price, "kwh": round(kwh), "minutes": charge_min,
+                       "cost_eur": round(kwh * price, 2)}
+                st["score"] = detour_km + charge_min    # minutes lost: detour at ~60 km/h plus charging
+            out.append(st)
+        near = [s for s in out if s["near_route"]]
+        pool = near or out
+        pool.sort(key=lambda s: (s["score"], s["detour_km"]))
+        return pool[:limit]
+
+    def _suggested_stop(self, v):
+        """The station the "Refuel now" / "Charge now" button would add, or None."""
+        if not self.can_add_energy_stop(v):
+            return None
+        opts = self.energy_stop_options(v, limit=1)
+        return {k: opts[0][k] for k in opts[0] if k != "score"} if opts else None
+
+    def can_add_energy_stop(self, v):
+        return (v["energy"] / v["tank"] * 100 < LOW_ENERGY_PCT and not v.get("fuel_stop")
+                and (v["status"] in MOVING or v["status"] in ("idle", "routing")))
+
+    def add_energy_stop(self, vid, station_id=None):
+        """One tap from the dashboard: add the suggested (or a chosen) station as the next stop.
+        Low risk under the company policy, so it is applied straight away; the vehicle resumes its
+        trip after refuelling / charging."""
+        with self.lock:
+            v = self.vehicles.get(vid)
+            if not v:
+                return {"ok": False, "error": "unknown vehicle"}
+            if v.get("fuel_stop"):
+                return {"ok": False, "error": f"{vid} already has a fuel or charging stop"}
+            if not self.can_add_energy_stop(v):
+                return {"ok": False, "error": f"{vid} can't take a stop right now ({v['status']}, "
+                                              f"{round(100 * v['energy'] / v['tank'])}% {v['unit']})"}
+            opts = self.energy_stop_options(v)
+            st = next((s for s in opts if s["id"] == station_id), None) if station_id else (opts[0] if opts else None)
+            if not st:
+                return {"ok": False, "error": "no reachable station" if not station_id else "station not offered"}
+            resume = v["after_route"] if v["status"] == "routing" else v["status"]
+            v["fuel_stop"] = {"station": {"key": st["id"], "name": st["name"], "lat": st["lat"], "lon": st["lon"]},
+                              "resume": None if resume == "idle" else resume, "minutes": st["minutes"], "info": st}
+            self.request_route(v, st["lat"], st["lon"], "to_fuel")
+        if v["energy_type"] == "diesel":
+            more = (f"saves about EUR {st['saving_eur']} vs the national average" if st["saving_eur"] >= 0
+                    else f"EUR {-st['saving_eur']} above the national average but the only station on the way")
+            text = (f"{vid}: refuel stop added at {st['name']} (EUR {st['price_eur_l']}/L, about {st['litres']} L, "
+                    f"+{st['detour_km']} km detour; {more}).")
+        else:
+            text = (f"{vid}: charging stop added at {st['name']} ({st['kw']} kW, about {st['minutes']} min for "
+                    f"{st['kwh']} kWh, +{st['detour_km']} km detour).")
+        self.add_log("Fleet manager", f"Tapped '{'Refuel' if v['energy_type'] == 'diesel' else 'Charge'} now' for {vid}.",
+                     "approval")
+        self.add_log("Fuel & Cost Agent", text + " Low risk, applied.", "decision")
+        return {"ok": True, "vehicle": vid, "stop": {k: st[k] for k in st if k != "score"}}
 
     # ---------------- per-tick update ----------------
     def speed_factor(self, v):
@@ -323,8 +437,8 @@ class World:
             self.add_log("Dispatch Agent", f"{v['id']} driver {v['driver']} reached 4.5 h driving: "
                          f"mandatory 45 min break started.", "decision")
             return
-        # low energy
-        if v["energy"] / v["tank"] < 0.12:
+        # low energy (not while already driving to a chosen station)
+        if v["energy"] / v["tank"] < 0.12 and v["status"] != "to_fuel":
             v["resume"], v["status"] = v["status"], "refuel"
             mins = 20 if v["energy_type"] == "diesel" else 40
             v["phase_until"] = self.sim + mins
@@ -345,6 +459,9 @@ class World:
             job["status"] = "loading"
         elif st == "to_dropoff" and job:
             v["status"], v["phase_until"] = "unloading", self.sim + 20
+        elif st == "to_fuel" and v.get("fuel_stop"):
+            v["status"], v["phase_until"] = "refuel", self.sim + v["fuel_stop"]["minutes"]
+            v["resume"] = "fuel_stop"     # marker: _finish_phase routes back to the trip
         elif st == "to_depot":
             if v.get("service_pending"):
                 v["status"], v["phase_until"] = "service", self.sim + 60
@@ -375,9 +492,22 @@ class World:
             else:
                 self.add_log("Dispatch Agent", f"{job['id']} delivered on time by {v['id']} at {job['dropoff']['name']}.")
             v["job_id"], v["status"] = None, "idle"
+        elif st == "refuel" and v["resume"] == "fuel_stop":
+            stop = v.pop("fuel_stop", None) or {}
+            v["energy"] = v["tank"] * (1.0 if v["energy_type"] == "diesel" else EV_CHARGE_TO)
+            v["resume"] = None
+            name = stop.get("station", {}).get("name", "the station")
+            self.add_log("Fuel & Cost Agent", f"{v['id']} {'refuelled' if v['energy_type'] == 'diesel' else 'charged'} "
+                         f"at {name}, back on its way.")
+            resume = stop.get("resume")
+            target = self.target_of(v, resume) if resume else None
+            if target:
+                self.request_route(v, target["lat"], target["lon"], resume)
+            else:
+                v["status"] = "idle"
         elif st in ("break", "refuel"):
             if st == "refuel":
-                v["energy"] = v["tank"] * (1.0 if v["energy_type"] == "diesel" else 0.9)
+                v["energy"] = v["tank"] * (1.0 if v["energy_type"] == "diesel" else EV_CHARGE_TO)
             v["status"] = v["resume"] or "idle"
             v["resume"] = None
         elif st == "service":
@@ -386,6 +516,8 @@ class World:
             self.add_log("Maintenance Agent", f"{v['id']} service complete, health 100%.")
         elif st == "broken":
             v["health"], v["fault"] = max(v["health"], 80), None
+            v.pop("fuel_stop", None)      # a planned fuel stop is dropped; the button comes back if still low
+            v["resume"] = None
             self.add_log("Maintenance Agent", f"{v['id']} repaired and back in service.")
             if job and job["vehicle"] == v["id"]:
                 t = job["pickup"] if job["status"] == "assigned" else job["dropoff"]
@@ -456,6 +588,8 @@ class World:
                     "drive_today_h": round(v["drive_today"] / 60, 1),
                     "since_break_h": round(v["drive_since_break"] / 60, 1),
                     "odometer": round(v["odometer"]), "route": remaining, "trip": self._trip_info(v),
+                    "energy_stop": self._suggested_stop(v),
+                    "fuel_stop": v["fuel_stop"]["station"]["name"] if v.get("fuel_stop") else None,
                     "speed_factor": round(self.speed_factor(v), 2) if v["status"] in MOVING else None})
             k = dict(self.kpi)
             k["on_time_pct"] = round(100 * (k["delivered"] - k["late"]) / k["delivered"]) if k["delivered"] else 100
