@@ -22,7 +22,19 @@ header { display: flex; align-items: center; gap: 16px; padding: 10px 16px; bord
 .controls button { background: var(--panel2); border: 1px solid var(--line); border-radius: 7px; padding: 6px 10px; }
 .controls button.on { border-color: var(--accent); color: var(--accent); }
 
-main { display: grid; grid-template-columns: 1fr 410px; height: calc(100vh - 57px - 250px); min-height: 560px; }
+main { display: grid; grid-template-columns: 1fr 410px; height: calc(100vh - 57px - 44px - 250px); min-height: 560px; }
+
+/* ---------- needs your attention ---------- */
+.attn { display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 16px; border-bottom: 1px solid var(--line); background: var(--bg); }
+.attn h2 { margin: 0; flex: none; white-space: nowrap; }
+.attn-list { display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; min-width: 0; flex: 1; scrollbar-width: thin; }
+.attn-item { flex: none; display: flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line);
+  border-left: 3px solid var(--c, var(--warn)); border-radius: 8px; padding: 3px 4px 3px 9px; font-size: 12px; white-space: nowrap; }
+.attn-item b { color: var(--c, var(--warn)); font-weight: 600; }
+.attn-item button { background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px; font-size: 11px; font-weight: 600; }
+.attn-item button:hover { border-color: var(--c, var(--accent)); color: var(--c, var(--accent)); }
+.appr.flash { animation: flash 1.2s; }
+@keyframes flash { 0%, 60% { box-shadow: 0 0 0 2px var(--warn); } 100% { box-shadow: none; } }
 .mapwrap { position: relative; }
 #map { position: absolute; inset: 0; background: #0e141c; }
 .legend { position: absolute; top: 10px; left: 50px; z-index: 500; display: flex; gap: 10px; background: rgba(18,26,36,.9);

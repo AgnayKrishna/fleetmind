@@ -201,6 +201,68 @@ $("#approvals").addEventListener("click", async e => {
   approvalsKey = ""; poll();
 });
 
+// ---------- needs your attention ----------
+// One strip above the map: pending approvals, late or overdue jobs, broken vehicles and low energy,
+// each with a single button that takes you to the thing that needs a decision.
+const LOW_ENERGY_PCT = 20;   // same red threshold as the fleet table; the sim auto-refuels at 12%
+let attnKey = "";
+
+function attentionItems(s) {
+  const items = [];
+  for (const a of s.approvals)
+    items.push({ c: "var(--warn)", kind: "Approval", text: a.title, btn: "Review", act: "approval", id: a.id });
+  const inApproval = id => s.approvals.some(a => `${a.title} ${a.summary}`.includes(id));
+  for (const v of s.vehicles) {
+    if (v.status === "broken" && !inApproval(v.id))
+      items.push({ c: "var(--bad)", kind: "Broken", text: `${v.id}${v.fault ? " · " + v.fault : ""}`, btn: "Show", act: "vehicle", id: v.id });
+    const t = v.trip;
+    if (t && t.cargo && !t.on_time)
+      items.push({ c: "var(--bad)", kind: "Late", text: `${v.job_id} on ${v.id}${t.late_min ? ` · ${t.late_min} min` : ""}`,
+        btn: "Show", act: "vehicle", id: v.id });
+    if (v.energy_pct < LOW_ENERGY_PCT && !["refuel", "broken", "service"].includes(v.status))
+      items.push({ c: "var(--fuel)", kind: "Low energy", text: `${v.id} · ${v.energy_pct}% (${v.range_km} km)`,
+        btn: "Show", act: "vehicle", id: v.id });
+  }
+  for (const j of s.jobs)
+    if (j.status === "pending" && j.window_end < s.sim)
+      items.push({ c: "var(--bad)", kind: "Overdue", text: `${j.id} not picked up · due ${j.window_end_str}`,
+        btn: "Show", act: "job", id: j.id });
+  return items;
+}
+
+function drawAttention(s) {
+  const items = attentionItems(s), n = items.length;
+  $("#attnCount").textContent = n; $("#attnCount").classList.toggle("zero", n === 0);
+  const key = JSON.stringify(items);
+  if (key === attnKey) return;   // only redraw on change so a button isn't swapped out under the cursor
+  attnKey = key;
+  $("#attnList").innerHTML = n ? items.map(i => `<div class="attn-item" style="--c:${i.c}">
+      <span><b>${esc(i.kind)}</b> ${esc(i.text)}</span>
+      <button data-act="${i.act}" data-id="${esc(i.id)}">${esc(i.btn)}</button></div>`).join("")
+    : `<p class="empty">All clear. Nothing needs you right now.</p>`;
+}
+
+function focusVehicle(id) {
+  if (selected !== id) return select(id);   // select() pans and opens the popup
+  const v = lastState?.vehicles.find(x => x.id === id);
+  if (v) { map.panTo([v.lat, v.lon]); markers[id]?.openPopup(); }
+}
+
+$("#attnList").addEventListener("click", e => {
+  const b = e.target.closest("button[data-act]"); if (!b) return;
+  const id = b.dataset.id;
+  if (b.dataset.act === "approval") {
+    showTab("ops");
+    const card = [...document.querySelectorAll("#approvals .appr")].find(c => c.dataset.id === id);
+    if (card) { card.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      card.classList.remove("flash"); void card.offsetWidth; card.classList.add("flash"); }
+  } else if (b.dataset.act === "vehicle") focusVehicle(id);
+  else if (b.dataset.act === "job") {
+    const m = jobMarkers[id];
+    if (m) { map.setView(m.getLatLng(), Math.max(map.getZoom(), 10)); m.openTooltip(); }
+  }
+});
+
 // Agent activity filter: null = show every agent, otherwise only that agent's entries.
 let logFilter = null;
 
@@ -245,7 +307,7 @@ function renderLegend() {
   $("#agentLegend").classList.toggle("filtering", !!logFilter);
   $("#agentLegend").innerHTML =
     `<button class="tag filterable${logFilter ? "" : " active"}" data-agent="" style="color:var(--text);border-color:var(--muted)"
-      aria-pressed="${!logFilter}">All</button>` +
+      aria-pressed="${!logFilter}">All agents</button>` +
     tags.map(([n, c]) => `<button class="tag filterable${logFilter === n ? " active" : ""}" data-agent="${esc(n)}"
       style="color:${c};border-color:${c}" aria-pressed="${logFilter === n}">${esc(n)}</button>`).join("");
 }
@@ -416,7 +478,7 @@ async function poll() {
     failures = 0; $("#offline").classList.add("hidden");
     lastState = s;
     if (s.gtm_kpi && !REF) setGtmCount(s.gtm_kpi.leads);
-    drawHeader(s); drawMap(s); drawKpis(s); drawApprovals(s); drawLog(s); drawFleet(s); drawChart(s);
+    drawHeader(s); drawMap(s); drawKpis(s); drawApprovals(s); drawAttention(s); drawLog(s); drawFleet(s); drawChart(s);
   } catch (e) {
     if (++failures > 2) { $("#apiUrl").textContent = API || location.origin; $("#offline").classList.remove("hidden"); }
   }

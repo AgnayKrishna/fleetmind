@@ -14,5 +14,5 @@ The owner and Claude plan this list each evening.
 
 ## Daytime (DAY mode, 1-2 tasks only)
 
-- [ ] **"Needs your attention" list** at the top of the dashboard: pending approvals, late jobs, broken vehicles and low fuel, each with one clear button.
-- [ ] **Agent log filter polish:** keep the clicked agent tag highlighted and show an "All agents" tag first.
+- [x] **"Needs your attention" list** at the top of the dashboard: pending approvals, late jobs, broken vehicles and low fuel, each with one clear button.
+- [x] **Agent log filter polish:** keep the clicked agent tag highlighted and show an "All agents" tag first.
