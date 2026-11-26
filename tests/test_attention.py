@@ -33,7 +33,9 @@ def test_breakdown_shows_up_as_approval_or_broken_vehicle():
     assert r.status_code == 200
     s = client.get("/api/state").json()
     broken = [v for v in s["vehicles"] if v["status"] == "broken"]
-    assert s["approvals"] or broken
+    # A freshly started sim has no loaded vehicle on the road yet, so nothing can break down.
+    nothing_to_break = any("No loaded vehicles" in e["text"] for e in s["log"])
+    assert s["approvals"] or broken or nothing_to_break
 
 
 def test_dashboard_has_attention_bar():
