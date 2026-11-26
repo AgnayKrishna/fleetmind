@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FleetMind control centre</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+<style>
+body{margin:0}
+a{color:#9A5B00}a:hover{color:#7A4700}
+button{font-family:inherit;cursor:pointer}
+.glass{backdrop-filter:blur(22px) saturate(170%);-webkit-backdrop-filter:blur(22px) saturate(170%)}
+.pulse{transform-box:fill-box;transform-origin:center;animation:pulse 2.4s ease-out infinite}
+@keyframes pulse{from{transform:scale(.6);opacity:.55}to{transform:scale(1.6);opacity:0}}
+.draw{stroke-dasharray:900;stroke-dashoffset:900;animation:draw 1.6s .4s ease-out forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.dots span{animation:blink 1.2s infinite}.dots span:nth-child(2){animation-delay:.2s}.dots span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,100%{opacity:.2}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.pulse,.draw,.dots span{animation:none;stroke-dashoffset:0;opacity:1}}
+@media (max-width:900px){.fp{position:static!important;width:auto!important;margin:12px}.mapwrap{position:relative!important;height:420px}}
+</style>
+</helmet>
+<div style="position: relative; min-height: 900px; height: 100vh; overflow: hidden; font-family: Manrope, sans-serif; color: {{t.ink}}; background: {{t.bg}}">
+<div class="mapwrap" style="position: absolute; inset: 0">
+<svg viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Live map of Riga region with trucks" style="width: 100%; height: 100%; display: block">
+<defs>
+<linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.45"/><stop offset="0.5" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.18"/></linearGradient>
+<linearGradient id="trail" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="{{t.amber}}" stop-opacity="0"/><stop offset="1" stop-color="{{t.amber}}" stop-opacity="0.55"/></linearGradient>
+<symbol id="truck" viewBox="-40 -16 80 32" overflow="visible">
+<ellipse cx="3" cy="4" rx="34" ry="11" fill="#000" opacity="0.22"/>
+<rect x="-32" y="-10" width="44" height="20" rx="3" fill="currentColor"/>
+<rect x="-32" y="-10" width="44" height="20" rx="3" fill="url(#shade)"/>
+<path d="M-24 -10v20M-16 -10v20M-8 -10v20M0 -10v20" stroke="#000" stroke-opacity="0.07"/>
+<rect x="12" y="-3" width="4" height="6" fill="#2A2C30"/>
+<rect x="15" y="-10" width="17" height="20" rx="5" fill="currentColor"/>
+<rect x="15" y="-10" width="17" height="20" rx="5" fill="url(#shade)"/>
+<rect x="25" y="-8" width="5" height="16" rx="2" fill="#18222B"/>
+<rect x="23" y="-12.5" width="3" height="2.5" rx="1" fill="#2A2C30"/><rect x="23" y="10" width="3" height="2.5" rx="1" fill="#2A2C30"/>
+</symbol>
+<symbol id="van" viewBox="-24 -14 48 28" overflow="visible">
+<ellipse cx="2" cy="3" rx="20" ry="10" fill="#000" opacity="0.22"/>
+<rect x="-18" y="-9" width="36" height="18" rx="6" fill="currentColor"/>
+<rect x="-18" y="-9" width="36" height="18" rx="6" fill="url(#shade)"/>
+<rect x="-13" y="-6" width="17" height="12" rx="3" fill="#fff" opacity="0.16"/>
+<rect x="8" y="-7" width="6" height="14" rx="2.5" fill="#18222B"/>
+</symbol>
+</defs>
+<rect width="1440" height="900" fill="{{t.bg}}"/>
+<path d="M0 0H560Q500 120 380 170Q260 230 130 210Q50 200 0 235Z" fill="{{t.water}}"/>
+<path d="M380 175Q520 300 600 380Q700 470 860 520Q1060 590 1440 640" fill="none" stroke="{{t.water}}" stroke-width="28"/>
+<rect x="880" y="140" width="160" height="90" rx="40" fill="{{t.park}}"/><rect x="180" y="560" width="190" height="110" rx="50" fill="{{t.park}}"/><rect x="1160" y="720" width="200" height="120" rx="50" fill="{{t.park}}"/>
+<g fill="none" stroke="{{t.minor}}" stroke-width="6" stroke-linecap="round">
+<path d="M420 300Q600 330 760 260"/><path d="M700 420Q760 520 900 560"/><path d="M450 470Q500 560 470 680"/><path d="M820 380Q900 300 1020 300"/><path d="M1050 330Q1100 450 1240 480"/><path d="M240 420Q300 360 420 300"/>
+</g>
+<g fill="none" stroke="{{t.road}}" stroke-width="14" stroke-linecap="round">
+<path d="M0 470Q300 430 560 420Q800 410 1050 330Q1250 270 1440 250"/>
+<path d="M560 420Q640 520 680 600Q720 720 740 900"/>
+<path d="M560 420Q420 520 330 700Q280 800 260 900"/>
+<path d="M560 420Q760 560 960 680Q1060 760 1120 900"/>
+<path d="M560 420Q520 300 560 150Q580 60 610 0"/>
+</g>
+<g font-family="Manrope, sans-serif" font-size="15" font-weight="600" fill="{{t.label}}">
+<text x="578" y="398">Riga</text><text x="230" y="300">Jurmala</text><text x="440" y="238">Freeport</text><text x="700" y="640">Bauska road</text><text x="1060" y="300">Sigulda road</text><text x="990" y="650">Ogre</text>
+</g>
+<path d="M980 340Q800 400 590 420Q650 500 680 590" fill="none" stroke="{{t.amber}}" stroke-width="5" stroke-linecap="round" class="draw"/>
+<g transform="translate(680 590)"><circle r="30" fill="{{t.act}}" class="pulse"/><circle r="26" fill="{{t.act}}" fill-opacity="0.16" stroke="{{t.act}}" stroke-opacity="0.5" stroke-width="2"/><g transform="rotate(62)"><use href="#truck" x="-34" y="-14" width="68" height="28" color="{{t.vDiesel}}"/></g></g>
+<g transform="translate(980 340)"><circle r="30" fill="{{t.amber}}" fill-opacity="0.18" stroke="{{t.amber}}" stroke-width="2.5"/><g transform="rotate(168)"><rect x="-78" y="-5" width="44" height="10" rx="5" fill="url(#trail)"/><use href="#truck" x="-34" y="-14" width="68" height="28" color="{{t.vDiesel}}"/></g></g>
+<g transform="translate(330 700)"><circle r="26" fill="{{t.watch}}" fill-opacity="0.16" stroke="{{t.watch}}" stroke-opacity="0.45" stroke-width="2"/><g transform="rotate(112)"><rect x="-56" y="-4" width="34" height="8" rx="4" fill="url(#trail)"/><use href="#van" x="-21" y="-12" width="42" height="24" color="{{t.vVan}}"/></g></g>
+<g transform="translate(500 290)"><circle r="24" fill="{{t.good}}" fill-opacity="0.14"/><g transform="rotate(-20)"><use href="#van" x="-21" y="-12" width="42" height="24" color="{{t.vEvVan}}"/></g></g>
+<g transform="translate(1230 280)"><circle r="28" fill="{{t.good}}" fill-opacity="0.14"/><g transform="rotate(-8)"><rect x="-78" y="-5" width="44" height="10" rx="5" fill="url(#trail)"/><use href="#truck" x="-34" y="-14" width="68" height="28" color="{{t.vEvTruck}}"/></g></g>
+<g><animateMotion dur="60s" repeatCount="indefinite" rotate="auto" path="M560 420Q760 560 960 680Q1060 760 1120 900"/><circle r="28" fill="{{t.good}}" fill-opacity="0.14"/><rect x="-78" y="-5" width="44" height="10" rx="5" fill="url(#trail)"/><use href="#truck" x="-34" y="-14" width="68" height="28" color="{{t.vDiesel}}"/></g>
+<g><animateMotion dur="75s" repeatCount="indefinite" rotate="auto" path="M0 470Q300 430 560 420Q800 410 1050 330Q1250 270 1440 250"/><circle r="28" fill="{{t.good}}" fill-opacity="0.14"/><rect x="-78" y="-5" width="44" height="10" rx="5" fill="url(#trail)"/><use href="#truck" x="-34" y="-14" width="68" height="28" color="{{t.vEvTruck}}"/></g>
+</svg>
+</div>
+
+<header class="fp glass" style="position: absolute; top: 20px; left: 20px; right: 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 12px 10px 18px; border-radius: 22px; background: {{t.glass}}; box-shadow: {{t.shadow}}; border: 1px solid {{t.glassBorder}}">
+<svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect width="30" height="30" rx="9" fill="{{t.amber}}"/><path d="M8 19h9l3-5h3v5h-2" fill="none" stroke="#1C1408" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<span style="font-weight: 800; font-size: 18px; letter-spacing: -0.3px">FleetMind</span>
+<label for="cmd" style="position: absolute; left: -9999px">Search or ask the AI team</label>
+<div style="flex: 1 1 260px; display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 14px; background: {{t.chip}}; margin-left: 8px; max-width: 420px">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{t.muted}}" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+<input id="cmd" placeholder="Search trucks or ask the AI team" style="flex: 1; min-width: 0; border: 0; background: transparent; font: inherit; font-size: 14px; color: {{t.ink}}; outline-offset: 4px">
+<span style="font-size: 12px; font-weight: 700; color: {{t.muted}}; padding: 3px 7px; border-radius: 6px; border: 1px solid {{t.line}}">Ctrl K</span>
+</div>
+<div style="flex-grow: 1"></div>
+<div style="display: flex; gap: 6px; flex-wrap: wrap">
+<span style="padding: 8px 12px; border-radius: 12px; background: {{t.chip}}; font-size: 13px"><b style="font-size: 15px">17</b><span style="color: {{t.muted}}">/30 on the road</span></span>
+<span style="padding: 8px 12px; border-radius: 12px; background: {{t.chip}}; font-size: 13px"><b style="font-size: 15px">96%</b><span style="color: {{t.muted}}"> on time</span></span>
+<span style="padding: 8px 12px; border-radius: 12px; background: {{t.chip}}; font-size: 13px"><b style="font-size: 15px">€1,240</b><span style="color: {{t.muted}}"> fuel today</span></span>
+<span style="padding: 8px 12px; border-radius: 12px; background: {{t.chip}}; font-size: 13px"><b style="font-size: 15px">8%</b><span style="color: {{t.muted}}"> empty km</span></span>
+</div>
+<button onClick="{{toggle}}" aria-label="{{modeLabel}}" style="width: 40px; height: 40px; border-radius: 12px; border: 0; background: {{t.chip}}; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{t.ink}}" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></button>
+<div style="width: 40px; height: 40px; border-radius: 50%; background: {{t.amberTint}}; color: {{t.amberText}}; font-weight: 800; display: flex; align-items: center; justify-content: center">AK</div>
+</header>
+
+<section class="fp glass" aria-label="Needs you" style="position: absolute; top: 96px; left: 20px; width: 360px; padding: 18px; border-radius: 22px; background: {{t.glass}}; box-shadow: {{t.shadow}}; border: 1px solid {{t.glassBorder}}; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; align-items: baseline; justify-content: space-between; padding: 0 4px 8px"><h2 style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.3px">Needs you</h2><span style="font-size: 13px; color: {{t.muted}}">4 of 212 decisions today</span></div>
+<div style="display: flex; gap: 12px; padding: 12px; border-radius: 16px; background: {{t.card}}">
+<span style="width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; background: {{t.act}}; box-shadow: 0 0 0 5px {{t.actTint}}; flex-shrink: 0"></span>
+<div style="flex: 1; min-width: 0"><div style="font-size: 15px; font-weight: 700">LV-T07 broke down</div><div style="font-size: 13px; color: {{t.muted}}; margin-top: 2px; line-height: 1.45">Engine overheating near Bauska. Dina has a replacement ready.</div></div>
+</div>
+<div style="display: flex; gap: 12px; padding: 12px; border-radius: 16px">
+<span style="width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; background: {{t.watch}}; flex-shrink: 0"></span>
+<div style="flex: 1; min-width: 0"><div style="font-size: 15px; font-weight: 700">J214 running 40 min late</div><div style="font-size: 13px; color: {{t.muted}}; margin-top: 2px; line-height: 1.45">Snow on the A6. Tell the customer?</div></div>
+<button style="align-self: center; padding: 8px 12px; min-height: 36px; border-radius: 10px; border: 1px solid {{t.line}}; background: transparent; color: {{t.ink}}; font-size: 13px; font-weight: 700">Notify</button>
+</div>
+<div style="display: flex; gap: 12px; padding: 12px; border-radius: 16px">
+<span style="width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; background: {{t.watch}}; flex-shrink: 0"></span>
+<div style="flex: 1; min-width: 0"><div style="font-size: 15px; font-weight: 700">Voice note from Rustam</div><div style="font-size: 13px; color: {{t.muted}}; margin-top: 2px; line-height: 1.45">"Ramp 3 at the Freeport is closed." Translated from Russian.</div></div>
+<button style="align-self: center; padding: 8px 12px; min-height: 36px; border-radius: 10px; border: 1px solid {{t.line}}; background: transparent; color: {{t.ink}}; font-size: 13px; font-weight: 700">Reply</button>
+</div>
+<div style="display: flex; gap: 12px; padding: 12px; border-radius: 16px">
+<span style="width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; background: {{t.amber}}; flex-shrink: 0"></span>
+<div style="flex: 1; min-width: 0"><div style="font-size: 15px; font-weight: 700">Return load found</div><div style="font-size: 13px; color: {{t.muted}}; margin-top: 2px; line-height: 1.45">LV-T12 drives home empty. 9.8 t Valmiera to Riga, +€310.</div></div>
+<button style="align-self: center; padding: 8px 12px; min-height: 36px; border-radius: 10px; border: 1px solid {{t.line}}; background: transparent; color: {{t.ink}}; font-size: 13px; font-weight: 700">Accept</button>
+</div>
+</section>
+
+<section class="fp glass" aria-label="Your AI team" style="position: absolute; top: 96px; right: 20px; width: 320px; padding: 18px; border-radius: 22px; background: {{t.glass}}; box-shadow: {{t.shadow}}; border: 1px solid {{t.glassBorder}}; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px">
+<h2 style="margin: 0; padding: 0 4px; font-size: 20px; font-weight: 800; letter-spacing: -0.3px">Your AI team</h2>
+<div style="display: flex; gap: 12px; align-items: center"><div style="width: 38px; height: 38px; border-radius: 50%; background: {{t.amber}}; color: #1C1408; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0">A</div><div style="min-width: 0"><div style="font-size: 14px; font-weight: 700">Atlas <span style="font-weight: 500; color: {{t.muted}}">Lead</span></div><div style="font-size: 13px; color: {{t.amberText}}; font-weight: 600">Waiting for your approval</div></div></div>
+<div style="display: flex; gap: 12px; align-items: center"><div style="width: 38px; height: 38px; border-radius: 50%; background: {{t.chip}}; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0">D</div><div style="min-width: 0"><div style="font-size: 14px; font-weight: 700">Dina <span style="font-weight: 500; color: {{t.muted}}">Dispatch</span></div><div style="font-size: 13px; color: {{t.muted}}">Checked 9 trucks, picked LV-T03 <span class="dots"><span>.</span><span>.</span><span>.</span></span></div></div></div>
+<div style="display: flex; gap: 12px; align-items: center"><div style="width: 38px; height: 38px; border-radius: 50%; background: {{t.chip}}; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0">M</div><div style="min-width: 0"><div style="font-size: 14px; font-weight: 700">Max <span style="font-weight: 500; color: {{t.muted}}">Maintenance</span></div><div style="font-size: 13px; color: {{t.muted}}">Repair about 2 h, tow €280</div></div></div>
+<div style="display: flex; gap: 12px; align-items: center"><div style="width: 38px; height: 38px; border-radius: 50%; background: {{t.chip}}; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0">R</div><div style="min-width: 0"><div style="font-size: 14px; font-weight: 700">Ruta <span style="font-weight: 500; color: {{t.muted}}">Routes</span></div><div style="font-size: 13px; color: {{t.muted}}">Watching snow on the A6</div></div></div>
+<div style="display: flex; gap: 12px; align-items: center"><div style="width: 38px; height: 38px; border-radius: 50%; background: {{t.chip}}; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0">L</div><div style="min-width: 0"><div style="font-size: 14px; font-weight: 700">Leo <span style="font-weight: 500; color: {{t.muted}}">Fuel and cost</span></div><div style="font-size: 13px; color: {{t.muted}}">Fuel use normal on all trucks</div></div></div>
+</section>
+
+<section class="fp glass" aria-label="Selected truck" style="position: absolute; bottom: 20px; left: 400px; right: 360px; padding: 20px 22px; border-radius: 26px; background: {{t.glass}}; box-shadow: {{t.shadow}}; border: 1px solid {{t.glassBorder}}; display: flex; flex-direction: column; gap: 14px">
+<div style="width: 40px; height: 5px; border-radius: 3px; background: {{t.line}}; align-self: center; margin-top: -8px"></div>
+<div style="display: flex; gap: 18px; align-items: center; flex-wrap: wrap">
+<svg width="120" height="64" viewBox="-60 -32 120 64" aria-hidden="true"><g transform="rotate(-12)"><use href="#truck" x="-52" y="-21" width="104" height="42" color="{{t.vDiesel}}"/></g></svg>
+<div style="flex: 1 1 240px; min-width: 0">
+<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap"><span style="font-size: 22px; font-weight: 800; letter-spacing: -0.4px">LV-T03</span><span style="padding: 4px 10px; border-radius: 999px; background: {{t.amberTint}}; color: {{t.amberText}}; font-size: 12px; font-weight: 700">Recommended</span><span style="padding: 4px 10px; border-radius: 999px; background: {{t.goodTint}}; color: {{t.goodText}}; font-size: 12px; font-weight: 700">Arrives on time</span></div>
+<div style="font-size: 14px; color: {{t.muted}}; margin-top: 4px">Janis Ozols · Diesel truck · 14 km from LV-T07 · 6 h driving left today</div>
+</div>
+<div style="text-align: right"><div style="font-size: 26px; font-weight: 800; letter-spacing: -0.5px">12:40</div><div style="font-size: 13px; color: {{t.muted}}">deadline 13:00</div></div>
+</div>
+<div style="display: flex; gap: 10px; flex-wrap: wrap">
+<button style="min-height: 48px; padding: 0 18px; border-radius: 14px; border: 0; background: {{t.chip}}; color: {{t.ink}}; font-size: 15px; font-weight: 700">Message Janis</button>
+<button style="min-height: 48px; padding: 0 18px; border-radius: 14px; border: 0; background: {{t.chip}}; color: {{t.ink}}; font-size: 15px; font-weight: 700">Other options</button>
+<button style="flex: 1 1 200px; min-height: 48px; border-radius: 14px; border: 0; background: {{t.amber}}; color: #1C1408; font-size: 16px; font-weight: 800">Send LV-T03 to collect the load</button>
+</div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+const dark = this.state && this.state.dark !== undefined ? this.state.dark : (this.props.dark ?? false);
+const L = { bg: '#ECEDEF', water: '#D5E1EA', park: '#DFE8DD', road: '#FFFFFF', minor: '#F6F6F7', label: '#80848B', glass: 'rgba(255,255,255,0.74)', glassBorder: 'rgba(255,255,255,0.75)', shadow: '0 1px 2px rgba(24,25,28,0.06), 0 12px 32px rgba(24,25,28,0.10)', card: 'rgba(255,255,255,0.9)', ink: '#18191C', muted: '#5E6168', line: 'rgba(24,25,28,0.12)', chip: 'rgba(24,25,28,0.05)', amber: '#F2A42B', amberText: '#8F5400', amberTint: '#FCEBCB', good: '#1F9D6B', goodTint: '#DDF2E8', goodText: '#13684A', watch: '#7C5CE0', act: '#D93A3A', actTint: 'rgba(217,58,58,0.16)', vDiesel: '#2E3035', vVan: '#F7F7F5', vEvTruck: '#F2A42B', vEvVan: '#F6D49A' };
+const D = { bg: '#141517', water: '#1A2530', park: '#18221B', road: '#2A2C30', minor: '#202225', label: '#7C8088', glass: 'rgba(30,31,34,0.72)', glassBorder: 'rgba(255,255,255,0.08)', shadow: '0 1px 2px rgba(0,0,0,0.4), 0 16px 40px rgba(0,0,0,0.45)', card: 'rgba(255,255,255,0.06)', ink: '#F1EFEA', muted: '#A2A5AB', line: 'rgba(255,255,255,0.14)', chip: 'rgba(255,255,255,0.07)', amber: '#FFB547', amberText: '#FFC46B', amberTint: 'rgba(255,181,71,0.16)', good: '#3BC48A', goodTint: 'rgba(59,196,138,0.16)', goodText: '#6EDAAA', watch: '#9C82FF', act: '#FF5C5C', actTint: 'rgba(255,92,92,0.2)', vDiesel: '#5C616B', vVan: '#ECECEA', vEvTruck: '#FFB547', vEvVan: '#F6D49A' };
+return { t: dark ? D : L, modeLabel: dark ? 'Switch to light mode' : 'Switch to dark mode', toggle: () => this.setState({ dark: !dark }) };
+}
+}
+</script>
+</body>
+</html>
