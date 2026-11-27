@@ -13,7 +13,7 @@ The owner and Claude plan this list each evening.
 
 ## Daytime (DAY mode, 1-2 tasks only)
 
-- [ ] **Label sample fuel and charger data.** The fuel stations, chargers and prices added for the Refuel/Charge button are made up. Show "Sample data" wherever they appear (button tooltip, popups) until real data is connected.
+- [x] **Label sample fuel and charger data.** The fuel stations, chargers and prices added for the Refuel/Charge button are made up. Show "Sample data" wherever they appear (button tooltip, popups) until real data is connected.
 - [ ] **Count refuel savings.** Include savings from choosing cheaper stations in the dashboard's fuel-cost and savings figures, not only in the log.
 
 ## Done

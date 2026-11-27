@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from . import services
 from .data import (CARGO, CHARGERS, CO2, DEPOTS, DRIVER_NAMES, FLEET_MIX, FUEL_STATIONS, HAZMAT_CARGO, LOCATIONS,
-                   PRICES, VEHICLE_DIMENSIONS, VEHICLE_TYPES, loc, random_pickup)
+                   PRICES, SAMPLE_ENERGY_DATA, VEHICLE_DIMENSIONS, VEHICLE_TYPES, loc, random_pickup)
 
 MOVING = ("to_pickup", "to_dropoff", "to_depot", "to_fuel")
 TIMED = ("loading", "unloading", "break", "refuel", "service", "broken")
@@ -283,7 +283,7 @@ class World:
             off_km = min(services.haversine(p[0], p[1], lat, lon) for p in pts) * 1.25
             detour_km = round(2 * off_km, 1)
             st = {"id": sid, "name": name, "lat": lat, "lon": lon, "detour_km": detour_km,
-                  "near_route": off_km <= NEAR_ROUTE_KM}
+                  "near_route": off_km <= NEAR_ROUTE_KM, "sample": SAMPLE_ENERGY_DATA}
             if diesel:
                 price = row[4]
                 litres = v["tank"] - max(0.0, v["energy"] - to_km * use)
@@ -348,6 +348,8 @@ class World:
                     f"{st['kwh']} kWh, +{st['detour_km']} km detour).")
         self.add_log("Fleet manager", f"{by or 'Fleet manager'} tapped "
                      f"'{'Refuel' if v['energy_type'] == 'diesel' else 'Charge'} now' for {vid}.", "approval")
+        if st["sample"]:
+            text += " [Sample data: station and price are made up.]"
         self.add_log("Fuel & Cost Agent", text + " Low risk, applied.", "decision")
         return {"ok": True, "vehicle": vid, "stop": {k: st[k] for k in st if k != "score"}}
 
@@ -592,7 +594,7 @@ class World:
             v["resume"] = None
             name = stop.get("station", {}).get("name", "the station")
             self.add_log("Fuel & Cost Agent", f"{v['id']} {'refuelled' if v['energy_type'] == 'diesel' else 'charged'} "
-                         f"at {name}, back on its way.")
+                         f"at {name}, back on its way." + (" [Sample data]" if stop.get("info", {}).get("sample") else ""))
             resume = stop.get("resume")
             target = self.target_of(v, resume) if resume else None
             if target:
@@ -684,6 +686,7 @@ class World:
                     "odometer": round(v["odometer"]), "route": remaining, "trip": self._trip_info(v),
                     "energy_stop": self._suggested_stop(v),
                     "fuel_stop": v["fuel_stop"]["station"]["name"] if v.get("fuel_stop") else None,
+                    "fuel_stop_sample": bool(v.get("fuel_stop") and v["fuel_stop"]["info"].get("sample")),
                     "route_source": v["route_source"] if remaining else None,
                     "traffic_delay_min": v["traffic_delay_min"] if remaining else 0,
                     "dims": {k2: v[k2] for k2 in ("height_m", "width_m", "length_m", "weight_kg", "axles")},

@@ -89,6 +89,18 @@ def test_ev_gets_charger_with_charge_time():
     assert v["status"] == "idle" and abs(v["energy"] - v["tank"] * 0.9) < 0.5
 
 
+def test_made_up_stations_are_labelled_sample():
+    w = make_world()
+    v = first(w, "truck_diesel")
+    v["energy"] = v["tank"] * 0.15
+    snap = next(x for x in w.snapshot()["vehicles"] if x["id"] == v["id"])
+    assert snap["energy_stop"]["sample"] is True and snap["fuel_stop_sample"] is False
+    assert all(o["sample"] for o in w.energy_stop_options(v, limit=50))
+    assert w.add_energy_stop(v["id"])["ok"]
+    assert next(x for x in w.snapshot()["vehicles"] if x["id"] == v["id"])["fuel_stop_sample"] is True
+    assert any("Sample data" in e["text"] for e in w.log if e["text"].startswith(v["id"]))
+
+
 def test_no_button_when_energy_is_fine():
     w = make_world()
     v = first(w, "van_diesel")

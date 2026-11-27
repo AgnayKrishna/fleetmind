@@ -115,6 +115,8 @@ function popup(v) {
     ${v.fault ? `<br><span style="color:var(--bad)">Fault: ${esc(v.fault)}</span>` : ""}
     ${tripHtml(v)}
     <br>Energy: ${v.energy_pct}% (${v.range_km} km range)
+    ${v.fuel_stop ? `<br>${v.unit === "kWh" ? "Charging" : "Fuel"} stop: ${esc(v.fuel_stop)}` +
+      `${v.fuel_stop_sample ? ` <span class="sample-tag">Sample data</span>` : ""}` : ""}
     <br>Health: ${v.health}% · service in ${v.service_due_km.toLocaleString()} km
     <br>Driving today: ${v.drive_today_h} h · since break ${v.since_break_h} h
     ${v.speed_factor !== null && v.speed_factor < 1 ? `<br>Slowed to ${Math.round(v.speed_factor * 100)}% speed` : ""}
@@ -270,9 +272,10 @@ function attentionItems(s) {
       const st = canOps() ? v.energy_stop : null, ev = v.unit === "kWh";
       const btn = !st ? "Show" : ev ? `Charge now · ${st.minutes} min` : `Refuel now · €${st.price_eur_l.toFixed(2)}/L`;
       items.push({ c: "var(--fuel)", kind: "Low energy", text: `${v.id} · ${v.energy_pct}% (${v.range_km} km)`,
-        btn, act: st ? "energy" : "vehicle", id: v.id,
+        btn, act: st ? "energy" : "vehicle", id: v.id, sample: !!st?.sample,
         title: st ? `${st.name} · +${st.detour_km} km detour` + (ev ? ` · ${st.kw} kW, ~${st.kwh} kWh, €${st.cost_eur}`
-          : ` · ~${st.litres} L, €${st.cost_eur}` + (st.saving_eur > 0 ? `, saves €${st.saving_eur}` : "")) : "" });
+          : ` · ~${st.litres} L, €${st.cost_eur}` + (st.saving_eur > 0 ? `, saves €${st.saving_eur}` : ""))
+          + (st.sample ? " · Sample data (made-up stations and prices)" : "") : "" });
     }
   }
   for (const j of s.jobs)
@@ -289,7 +292,7 @@ function drawAttention(s) {
   if (key === attnKey) return;   // only redraw on change so a button isn't swapped out under the cursor
   attnKey = key;
   $("#attnList").innerHTML = n ? items.map(i => `<div class="attn-item" style="--c:${i.c}">
-      <span><b>${esc(i.kind)}</b> ${esc(i.text)}</span>
+      <span><b>${esc(i.kind)}</b> ${esc(i.text)}${i.sample ? ` <span class="sample-tag">Sample data</span>` : ""}</span>
       <button data-act="${i.act}" data-id="${esc(i.id)}"${i.title ? ` title="${esc(i.title)}"` : ""}>${esc(i.btn)}</button></div>`).join("")
     : `<p class="empty">All clear. Nothing needs you right now.</p>`;
 }

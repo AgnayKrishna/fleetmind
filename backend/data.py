@@ -76,6 +76,11 @@ CO2 = {"diesel_kg_l": 2.68, "electric_kg_kwh": 0.10}
 # Demo fuel stations and chargers along the main Latvian freight roads. Locations are approximate
 # and prices are estimates around the national average above, so the Fuel & Cost Agent (Leo) has a
 # realistic spread to choose from. (id, name, lat, lon, diesel EUR/L)
+# These stations, chargers and prices are made up. While this is True the API marks every station
+# suggestion with "sample": true and the dashboard shows "Sample data" next to it. Set it to False
+# once real station and price data is connected.
+SAMPLE_ENERGY_DATA = True
+
 FUEL_STATIONS = [
     ("F01", "Circle K Jugla, Riga", 56.983, 24.233, 1.99),
     ("F02", "Neste Brivibas iela, Riga", 56.970, 24.160, 2.08),
