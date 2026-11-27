@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FleetMind dispatcher shift view</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+<style>body{margin:0}button{font-family:inherit;cursor:pointer}button:focus-visible{outline:2px solid #8F5400;outline-offset:2px}</style>
+</helmet>
+<div style="width: 1440px; height: 900px; box-sizing: border-box; background: #F2F3F5; font-family: Manrope, sans-serif; color: #18191C; display: flex; flex-direction: column">
+<header style="height: 64px; flex-shrink: 0; display: flex; align-items: center; gap: 16px; padding: 0 24px; background: #FFFFFF; border-bottom: 1px solid rgba(24,25,28,0.10)">
+<div style="display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 17px"><svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#1C1408"/><path d="M8 20h10l3-5h3v5h-2" fill="none" stroke="#F2A42B" stroke-width="2.2" stroke-linejoin="round"/><circle cx="12" cy="22" r="2" fill="#F2A42B"/><circle cx="21" cy="22" r="2" fill="#F2A42B"/></svg>FleetMind</div>
+<nav aria-label="Main" style="display: flex; gap: 4px; margin-left: 12px; font-size: 14px; font-weight: 700">
+<a aria-current="page" style="padding: 9px 14px; border-radius: 10px; background: rgba(24,25,28,0.06); color: #18191C; font-weight: 800">My shift</a><a style="padding: 9px 14px; color: #5E6168">Map</a><a style="padding: 9px 14px; color: #5E6168">Fleet</a><a style="padding: 9px 14px; color: #5E6168">Orders</a><a style="padding: 9px 14px; color: #5E6168">AI activity</a>
+</nav>
+<div style="flex-grow: 1"></div>
+<span style="font-size: 13px; color: #5E6168">Baltic Freight Riga</span>
+<span style="font-size: 12px; font-weight: 800; padding: 5px 10px; border-radius: 999px; background: #E1EDFB; color: #1D5FAE">Dispatcher, day shift 07:00 to 15:00</span>
+<div style="width: 36px; height: 36px; border-radius: 50%; background: #E1EDFB; color: #1D5FAE; font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center">IK</div>
+</header>
+<main style="flex-grow: 1; min-height: 0; padding: 20px 24px 24px; display: grid; grid-template-columns: 360px minmax(0, 1fr) 380px; gap: 20px">
+<section aria-label="My trucks" style="background: #FFFFFF; border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 1px 2px rgba(24,25,28,0.06)">
+<div style="display: flex; align-items: baseline; justify-content: space-between"><h2 style="margin: 0; font-size: 18px; font-weight: 800">My trucks</h2><span style="font-size: 13px; color: #5E6168">12 of 30</span></div>
+<p style="margin: 0 0 6px; font-size: 13px; color: #5E6168">Assigned to you for this shift. Ask Laura to change them.</p>
+<sc-for list="{{trucks}}" as="t" hint-placeholder-count="8"><div style="display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; background: {{t.rowBg}}">
+<span style="width: 22px; height: 12px; border-radius: 3px; background: {{t.vcol}}; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.15)"></span>
+<span style="font-weight: 800; font-size: 14px; width: 64px">{{t.plate}}</span>
+<span style="flex-grow: 1; font-size: 13px; color: #44474E">{{t.where}}</span>
+<span style="font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: {{t.sbg}}; color: {{t.sfg}}">{{t.status}}</span>
+</div></sc-for>
+</section>
+<section aria-label="Needs you" style="background: #FFFFFF; border-radius: 18px; padding: 20px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 1px 2px rgba(24,25,28,0.06)">
+<div><h1 style="margin: 0; font-size: 22px; font-weight: 800">Needs you</h1><p style="margin: 4px 0 0; font-size: 14px; color: #5E6168">You can approve changes up to €300 cost impact. Bigger ones go to Laura, the company admin.</p></div>
+<sc-for list="{{asks}}" as="a" hint-placeholder-count="3"><article style="border-radius: 14px; padding: 16px; background: {{a.bg}}; box-shadow: {{a.edge}}">
+<div style="display: flex; justify-content: space-between; gap: 12px"><div style="font-size: 16px; font-weight: 800; color: {{a.titleCol}}">{{a.title}}</div><span style="font-size: 12px; color: #5E6168; white-space: nowrap">{{a.who}}, {{a.time}}</span></div>
+<div style="font-size: 14px; color: #44474E; margin-top: 6px; line-height: 1.5">{{a.body}}</div>
+<div style="font-size: 13px; font-weight: 700; margin-top: 8px; color: {{a.metaCol}}">{{a.meta}}</div>
+<div style="display: flex; gap: 8px; margin-top: 12px">
+<button style="display: {{a.showMain}}; min-height: 42px; padding: 0 16px; border-radius: 12px; border: 0; background: #F2A42B; color: #1C1408; font-size: 14px; font-weight: 800">{{a.main}}</button>
+<button style="min-height: 42px; padding: 0 16px; border-radius: 12px; border: 1px solid rgba(24,25,28,0.14); background: #FFFFFF; color: #18191C; font-size: 14px; font-weight: 700">{{a.second}}</button>
+</div>
+</article></sc-for>
+</section>
+<section aria-label="Driver messages" style="background: #FFFFFF; border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 1px 2px rgba(24,25,28,0.06)">
+<div style="display: flex; align-items: baseline; justify-content: space-between"><h2 style="margin: 0; font-size: 18px; font-weight: 800">Driver messages</h2><span style="font-size: 13px; color: #5E6168">from Telegram</span></div>
+<sc-for list="{{msgs}}" as="m" hint-placeholder-count="4"><div style="padding: 12px; border-radius: 12px; background: #F2F3F5">
+<div style="display: flex; justify-content: space-between; font-size: 13px"><b>{{m.who}}</b><span style="color: #5E6168">{{m.time}}</span></div>
+<div style="font-size: 14px; margin-top: 4px">{{m.text}}</div>
+<div style="font-size: 12px; color: #5E6168; margin-top: 4px">{{m.orig}}</div>
+</div></sc-for>
+<div style="flex-grow: 1"></div>
+<label style="display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid rgba(24,25,28,0.14); font-size: 14px; color: #5E6168">Reply to Andris (auto-translated to Russian)</label>
+</section>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+const S = { route:['On route','#DDF2E8','#13684A'], stop:['Loading','#E1EDFB','#1D5FAE'], idle:['Parked','#ECEDEF','#44474E'], watch:['Delay risk','#ECE7FC','#5B3FC4'], act:['Act now','#FBE3E3','#B42828'] };
+const V = { dt:'#2E3035', dv:'#F7F7F5', et:'#F2A42B', ev:'#F6D49A' };
+const T = [['LV-T07','et','A2 near Sigulda','act'],['LV-T03','dt','Ulmanis gatve','watch'],['LV-T01','dt','A8 to Jelgava','route'],['LV-E02','et','Krasta iela','route'],['LV-T09','dt','Riga port','stop'],['LV-V04','ev','Purvciems','route'],['LV-T11','dt','Depot','idle'],['LV-V12','dv','Brivibas iela','watch']];
+class Component extends DCLogic {
+renderVals() {
+  return {
+    trucks: T.map(([plate,v,where,s]) => ({ plate, where, vcol: V[v], status: S[s][0], sbg: S[s][1], sfg: S[s][2], rowBg: s==='act' ? '#FDF1F1' : 'transparent' })),
+    asks: [
+      { title:'Send LV-T03 to collect LV-T07\'s load', who:'Dina', time:'12:14', body:'LV-T07 broke down on the A2. LV-T03 is 18 km away with room for 16 pallets and 4 h 40 of driving left. Arrives 40 min late.', meta:'Cost impact €96, within your limit', metaCol:'#13684A', main:'Send LV-T03', second:'See other options', showMain:'inline-block', bg:'#FFFFFF', edge:'inset 0 0 0 2px #D93A3A', titleCol:'#18191C' },
+      { title:'Accept order ORD-2431 for LV-T11', who:'Dina', time:'12:02', body:'Riga port to Ogre, 12 pallets, pickup 14:30. LV-T11 is free at the depot.', meta:'Fits your limit', metaCol:'#13684A', main:'Assign LV-T11', second:'Not now', showMain:'inline-block', bg:'#F7F7F8', edge:'none', titleCol:'#18191C' },
+      { title:'Swap tomorrow\'s Valmiera run to an electric truck', who:'Ruta', time:'11:40', body:'Saves fuel but changes 3 drivers\' shifts and a customer time window.', meta:'Cost impact €420, sent to Laura for approval', metaCol:'#5B3FC4', main:'', second:'Add a note for Laura', showMain:'none', bg:'#F7F7F8', edge:'none', titleCol:'#44474E' }
+    ],
+    msgs: [
+      { who:'Andris, LV-T07', time:'12:11', text:'Engine warning light, I have stopped on the shoulder. Load is fine.', orig:'Written in Russian, translated' },
+      { who:'Ilze, LV-V12', time:'11:58', text:'Traffic on Brivibas, about 15 minutes late to Jugla.', orig:'Written in Latvian' },
+      { who:'Edgars, LV-T09', time:'11:31', text:'Port says loading will finish at 13:10.', orig:'Written in Latvian' },
+      { who:'Marta, LV-E02', time:'11:05', text:'Tapped "Loaded" with 2 photos.', orig:'Button in Telegram' }
+    ]
+  };
+}
+}
+</script>
+</body>
+</html>

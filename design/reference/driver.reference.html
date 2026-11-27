@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FleetMind driver today and delivery screens</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+<style>body{margin:0}button{font-family:inherit;cursor:pointer}button:focus-visible{outline:2px solid #8F5400;outline-offset:2px}</style>
+</helmet>
+<div style="width: 860px; height: 844px; display: flex; gap: 80px; font-family: Manrope, sans-serif; color: #18191C">
+
+<div aria-label="Driver today screen" style="width: 390px; height: 844px; border-radius: 44px; background: #F2F3F5; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 0 0 10px #18191C">
+<div style="height: 44px"></div>
+<div style="padding: 8px 20px 12px; display: flex; align-items: center; justify-content: space-between">
+<div><div style="font-size: 13px; color: #5E6168; font-weight: 700">Friday 27 Nov</div><div style="font-size: 24px; font-weight: 800; letter-spacing: -0.3px">Today, LV-T03</div></div>
+<button aria-label="Language" style="height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(24,25,28,0.14); background: #FFFFFF; font-size: 13px; font-weight: 800">LV</button>
+</div>
+<div style="margin: 0 16px; padding: 12px 14px; border-radius: 14px; background: #FFFFFF; display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; justify-content: space-between; font-size: 14px"><b>4 h 40 driving left</b><span style="color: #5E6168">Break due in 1 h 10</span></div>
+<div style="height: 8px; border-radius: 4px; background: #ECEDEF; overflow: hidden"><div style="height: 8px; width: 48%; background: #1F9D6B"></div></div>
+</div>
+<article style="margin: 12px 16px 0; padding: 16px; border-radius: 18px; background: #FFFFFF; box-shadow: inset 0 0 0 2px #F2A42B; display: flex; flex-direction: column; gap: 8px">
+<span style="align-self: flex-start; font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: #FCEBCB; color: #8F5400">Now, new job from Dina</span>
+<div style="font-size: 20px; font-weight: 800">Collect load near Sigulda</div>
+<div style="font-size: 14px; color: #44474E; line-height: 1.5">A2, km 47, lay-by after the Sigulda turn. Truck LV-T07 is waiting. 16 pallets, 10 t, for Baltic Timber.</div>
+<div style="font-size: 14px"><b>Arrive by 12:40</b> · then Valmiera by 15:00</div>
+<div style="font-size: 13px; color: #5E6168">Contact: Andris (LV-T07) +371 2••• ••••</div>
+<div style="display: flex; gap: 8px; margin-top: 4px">
+<button style="flex: 1; min-height: 52px; border-radius: 14px; border: 0; background: #18191C; color: #FFFFFF; font-size: 16px; font-weight: 800">Navigate</button>
+<button style="flex: 1; min-height: 52px; border-radius: 14px; border: 0; background: #F2A42B; color: #1C1408; font-size: 16px; font-weight: 800">I've arrived</button>
+</div>
+</article>
+<div style="padding: 16px 20px 6px; font-size: 15px; font-weight: 800">Later today</div>
+<div style="margin: 0 16px; border-radius: 16px; background: #FFFFFF; overflow: hidden">
+<sc-for list="{{later}}" as="j" hint-placeholder-count="3"><div style="display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-bottom: 1px solid rgba(24,25,28,0.06)"><span style="font-size: 14px; font-weight: 800; width: 48px">{{j.time}}</span><span style="flex-grow: 1"><span style="font-size: 14px; font-weight: 700">{{j.what}}</span><br><span style="font-size: 12px; color: #5E6168">{{j.note}}</span></span></div></sc-for>
+</div>
+<div style="flex-grow: 1"></div>
+<div style="padding: 12px 16px 28px; display: flex; gap: 8px">
+<button style="flex: 1; min-height: 50px; border-radius: 14px; border: 2px solid #D93A3A; background: #FFFFFF; color: #B42828; font-size: 15px; font-weight: 800">Report a problem</button>
+<button style="flex: 1; min-height: 50px; border-radius: 14px; border: 1px solid rgba(24,25,28,0.14); background: #FFFFFF; color: #18191C; font-size: 15px; font-weight: 700">Start break</button>
+</div>
+</div>
+
+<div aria-label="Driver delivery screen" style="width: 390px; height: 844px; border-radius: 44px; background: #F2F3F5; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 0 0 10px #18191C">
+<div style="height: 44px"></div>
+<div style="padding: 8px 20px 12px"><div style="font-size: 13px; color: #5E6168; font-weight: 700">Valmiera, Rigas iela 12</div><div style="font-size: 24px; font-weight: 800; letter-spacing: -0.3px">Hand over the load</div></div>
+<section style="margin: 0 16px; padding: 16px; border-radius: 18px; background: #FFFFFF; display: flex; flex-direction: column; gap: 12px">
+<div style="font-size: 15px; font-weight: 800">1. Photos of the load</div>
+<div style="display: flex; gap: 8px">
+<div style="width: 96px; height: 96px; border-radius: 12px; background: #DADCE0"></div><div style="width: 96px; height: 96px; border-radius: 12px; background: #DADCE0"></div>
+<button aria-label="Add photo" style="width: 96px; height: 96px; border-radius: 12px; border: 2px dashed #8A8F98; background: transparent; font-size: 28px; color: #5E6168">+</button>
+</div>
+<div style="font-size: 15px; font-weight: 800">2. Who received it</div>
+<div style="height: 48px; border-radius: 12px; border: 1px solid rgba(24,25,28,0.14); display: flex; align-items: center; padding: 0 14px; font-size: 15px">R. Ozola</div>
+<div style="font-size: 15px; font-weight: 800">3. Signature</div>
+<div style="height: 130px; border-radius: 12px; border: 1px solid rgba(24,25,28,0.14); position: relative"><svg width="100%" height="130" viewBox="0 0 320 130" aria-hidden="true"><path d="M30 90 C 60 40, 80 110, 110 70 S 160 50, 180 85 S 240 60, 280 75" fill="none" stroke="#18191C" stroke-width="2.5" stroke-linecap="round"/></svg><button style="position: absolute; right: 10px; top: 10px; border: 0; background: transparent; font-size: 13px; font-weight: 700; color: #5E6168">Clear</button></div>
+<label style="display: flex; gap: 10px; align-items: center; font-size: 14px; color: #44474E"><span style="width: 22px; height: 22px; border-radius: 6px; border: 2px solid #8A8F98"></span>Something is damaged or missing</label>
+</section>
+<div style="flex-grow: 1"></div>
+<div style="padding: 12px 16px 28px"><button style="width: 100%; min-height: 56px; border-radius: 16px; border: 0; background: #F2A42B; color: #1C1408; font-size: 17px; font-weight: 800">Delivered</button><div style="text-align: center; font-size: 13px; color: #5E6168; margin-top: 8px">Works offline. Sends when you have signal.</div></div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":860,"height":844}}'>
+class Component extends DCLogic { renderVals() { return { later: [
+  { time:'15:00', what:'Deliver to Baltic Timber, Valmiera', note:'Photos and signature needed' },
+  { time:'16:30', what:'Break, 45 min', note:'Rest area planned at Ligatne' },
+  { time:'18:10', what:'Back to depot, Darzciems', note:'Fuel stop planned: Circle K Jugla' }
+] }; } }
+</script>
+</body>
+</html>
