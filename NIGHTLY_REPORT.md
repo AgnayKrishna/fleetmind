@@ -148,4 +148,4 @@ Newest at the bottom.
 5. **SQLite on Railway/Render:** the file is lost on each redeploy unless you attach a disk or set `DATABASE_URL` to a hosted database. Which do you want?
 6. **Hazmat:** only "fertiliser bags" count as hazmat, as an ADR class 5.1 stand-in. Should any other cargo count?
 
-**Push:** see below.
+**Push:** `git push origin nightly` succeeded (`a4acfcd..fd34506`, plus this line). `main` was not touched.
