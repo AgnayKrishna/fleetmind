@@ -14,6 +14,7 @@ TIMED = ("loading", "unloading", "break", "refuel", "service", "broken")
 BREAK_AFTER_MIN = 270      # EU rule: 4.5 h driving, then a 45 min break
 BREAK_MIN = 45
 DAILY_DRIVE_MAX = 540      # 9 h per day
+DAILY_REST_MIN = 660       # an 11 h rest gives the driver a fresh day of driving hours
 RIGA = (56.95, 24.11)
 LOW_ENERGY_PCT = 20        # dashboard offers "Refuel now" / "Charge now" below this; auto-refuel stays at 12%
 NEAR_ROUTE_KM = 15         # a station this close to the remaining route counts as "on the way"
@@ -32,6 +33,7 @@ class World:
         self.rng = random.Random(seed)
         self.lock = threading.RLock()
         self.sim = 6 * 60.0          # starts 06:00
+        self._last_day = int(self.sim // 1440)
         self.speed = 2.0             # sim minutes per real second
         self.paused = False
         self.vehicles, self.jobs, self.approvals = {}, {}, {}
@@ -81,7 +83,7 @@ class World:
                     "odometer": self.rng.randint(20000, 420000),
                     "km_since_service": self.rng.randint(2000, int(spec["service_km"] * 0.97)),
                     "service_km": spec["service_km"], "health": self.rng.randint(55, 100),
-                    "drive_since_break": self.rng.randint(0, 60), "drive_today": 0.0,
+                    "drive_since_break": self.rng.randint(0, 60), "drive_today": 0.0, "last_drive": self.sim,
                     "use_mult": 1.0, "avoid_zones": set(), "fault": None, "trip_km": 0.0,
                 }
 
@@ -357,6 +359,7 @@ class World:
         with self.lock:
             self.sim += dt
             now = self.sim
+            self._reset_driver_hours(now)
             for v in self.vehicles.values():
                 st = v["status"]
                 if st in TIMED and now >= v["phase_until"]:
@@ -381,6 +384,17 @@ class World:
                 self.history = self.history[-60:]
         if self.periodic_hook:
             self.periodic_hook(self, now)
+
+    def _reset_driver_hours(self, now):
+        """Drivers get fresh hours when a new sim day starts, or after an 11 h rest (no driving)."""
+        day = int(now // 1440)
+        new_day = day != self._last_day
+        self._last_day = day
+        for v in self.vehicles.values():
+            rested = v["status"] not in MOVING and now - v.get("last_drive", now) >= DAILY_REST_MIN
+            if new_day or (rested and (v["drive_today"] or v["drive_since_break"])):
+                v["drive_today"] = 0.0
+                v["drive_since_break"] = 0
 
     def _routine_dispatch(self):
         pending = sorted((j for j in self.jobs.values() if j["status"] == "pending" and not j.get("hold")),
@@ -423,6 +437,7 @@ class World:
         v["trip_km"] += km
         v["drive_since_break"] += dt
         v["drive_today"] += dt
+        v["last_drive"] = self.sim
         if self.rng.random() < km * 0.004:
             v["health"] = max(0, v["health"] - 1)
         # arrival
