@@ -214,6 +214,7 @@ function drawKpis(s) {
     [moving + "/" + s.vehicles.length, "vehicles on the road"], [k.delivered, "delivered"],
     [k.on_time_pct + "%", "on time"], [Math.round(k.km).toLocaleString(), "km driven"],
     ["€" + Math.round(k.fuel_cost + k.energy_cost).toLocaleString(), "fuel + charging"],
+    ["€" + Math.round(k.fuel_savings || 0).toLocaleString(), "saved at cheaper stations"],
     ["€" + k.cost_per_km.toFixed(2), "energy cost / km"], [Math.round(k.co2_kg).toLocaleString(), "kg CO₂"],
     [k.auto_decisions + " / " + k.approvals_done, "auto / approved"]];
   const g = s.gtm_kpi;

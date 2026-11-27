@@ -14,7 +14,7 @@ The owner and Claude plan this list each evening.
 ## Daytime (DAY mode, 1-2 tasks only)
 
 - [x] **Label sample fuel and charger data.** The fuel stations, chargers and prices added for the Refuel/Charge button are made up. Show "Sample data" wherever they appear (button tooltip, popups) until real data is connected.
-- [ ] **Count refuel savings.** Include savings from choosing cheaper stations in the dashboard's fuel-cost and savings figures, not only in the log.
+- [x] **Count refuel savings.** Include savings from choosing cheaper stations in the dashboard's fuel-cost and savings figures, not only in the log.
 
 ## Done
 - 2026-11-27 night: driver hours reset fix, SQLite database, Claude API mode, TomTom/HERE/OSRM truck routing with traffic, logins and 4 roles, driver phone page.

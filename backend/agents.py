@@ -501,7 +501,8 @@ class AgentTeam:
                         f"driven {v['drive_today_h']} h today, service in {v['service_due_km']} km"
                         + (f", fault: {v['fault']}" if v["fault"] else "") + ".")
         if any(x in m for x in ("cost", "fuel", "money", "spend", "co2")):
-            return (f"Fuel EUR {k['fuel_cost']} ({k['diesel_l']} L diesel at EUR {snap['prices']['diesel_eur_l']}/L), "
+            return (f"Fuel EUR {k['fuel_cost']} ({k['diesel_l']} L diesel, average EUR {snap['prices']['diesel_eur_l']}/L; "
+                    f"EUR {k['fuel_savings']} saved by refuelling at cheaper stations), "
                     f"electricity EUR {k['energy_cost']} ({k['kwh']} kWh), repairs EUR {k['repairs']}, penalties "
                     f"EUR {k['penalties']}. Cost per km EUR {k['cost_per_km']}, CO2 {k['co2_kg']} kg.")
         if any(x in m for x in ("late", "risk", "delay")):

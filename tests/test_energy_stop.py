@@ -101,6 +101,26 @@ def test_made_up_stations_are_labelled_sample():
     assert any("Sample data" in e["text"] for e in w.log if e["text"].startswith(v["id"]))
 
 
+def test_refuel_saving_counts_in_cost_and_savings_kpis():
+    w = make_world()
+    v = first(w, "truck_diesel")
+    v["energy"] = v["tank"] * 0.15
+    assert w.add_energy_stop(v["id"])["ok"]
+    info = v["fuel_stop"]["info"]
+    assert run_until(w, lambda: v["status"] == "refuel")
+    before_cost, before_saving = w.kpi["fuel_cost"], w.kpi["fuel_savings"]
+    litres = v["tank"] - v["energy"]
+    w.sim = v["phase_until"]            # finish the fill-up on the next tick, no more driving in between
+    w.tick(0.0)
+    assert "fuel_stop" not in v
+    use = 0.32 * v["use_mult"]
+    price_saving = litres * (PRICES["diesel_eur_l"] - info["price_eur_l"])
+    assert abs((before_cost - w.kpi["fuel_cost"]) - price_saving) < 0.01
+    assert abs((w.kpi["fuel_savings"] - before_saving)
+               - (price_saving - info["detour_km"] * use * info["price_eur_l"])) < 0.01
+    assert w.snapshot()["kpi"]["fuel_savings"] == round(w.kpi["fuel_savings"], 1)
+
+
 def test_no_button_when_energy_is_fine():
     w = make_world()
     v = first(w, "van_diesel")

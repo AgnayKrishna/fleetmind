@@ -44,7 +44,7 @@ class World:
                         "snow_cm": 0, "wind_kmh": 10, "code": 3}
         self.weather_real_at = 0.0
         self.kpi = dict(delivered=0, late=0, km=0.0, diesel_l=0.0, kwh=0.0, fuel_cost=0.0,
-                        energy_cost=0.0, co2_kg=0.0, penalties=0.0, repairs=0.0,
+                        energy_cost=0.0, co2_kg=0.0, penalties=0.0, repairs=0.0, fuel_savings=0.0,
                         auto_decisions=0, approvals_done=0, llm_decisions=0)
         self.history = []
         self.seq = {"job": max(100, job_seq), "log": 0, "appr": appr_seq, "zone": 0}   # db continues numbering
@@ -312,6 +312,21 @@ class World:
             return None
         opts = self.energy_stop_options(v, limit=1)
         return {k: opts[0][k] for k in opts[0] if k != "score"} if opts else None
+
+    def _count_refuel_saving(self, v, info):
+        """When a diesel vehicle fills up at the chosen station: fuel_cost so far counts every litre at the
+        national average, so correct it to the station's price for the litres bought, and add the net
+        saving (price difference minus the detour fuel, as the agent estimated) to the savings KPI.
+        A station dearer than average gives a negative saving, so the figure stays honest."""
+        price = info.get("price_eur_l")
+        if price is None:
+            return
+        litres = max(0.0, v["tank"] - v["energy"])
+        use = VEHICLE_TYPES[v["type"]]["use_per_km"] * v["use_mult"]
+        price_saving = litres * (PRICES["diesel_eur_l"] - price)
+        detour_eur = info.get("detour_km", 0) * use * price
+        self.kpi["fuel_cost"] -= price_saving
+        self.kpi["fuel_savings"] += price_saving - detour_eur
 
     def can_add_energy_stop(self, v):
         return (v["energy"] / v["tank"] * 100 < LOW_ENERGY_PCT and not v.get("fuel_stop")
@@ -590,6 +605,8 @@ class World:
             v["job_id"], v["status"] = None, "idle"
         elif st == "refuel" and v["resume"] == "fuel_stop":
             stop = v.pop("fuel_stop", None) or {}
+            if v["energy_type"] == "diesel":
+                self._count_refuel_saving(v, stop.get("info") or {})
             v["energy"] = v["tank"] * (1.0 if v["energy_type"] == "diesel" else EV_CHARGE_TO)
             v["resume"] = None
             name = stop.get("station", {}).get("name", "the station")
@@ -695,7 +712,7 @@ class World:
             k["on_time_pct"] = round(100 * (k["delivered"] - k["late"]) / k["delivered"]) if k["delivered"] else 100
             k["total_cost"] = round(k["fuel_cost"] + k["energy_cost"] + k["penalties"] + k["repairs"], 2)
             k["cost_per_km"] = round((k["fuel_cost"] + k["energy_cost"]) / k["km"], 3) if k["km"] > 1 else 0
-            for key in ("km", "diesel_l", "kwh", "fuel_cost", "energy_cost", "co2_kg"):
+            for key in ("km", "diesel_l", "kwh", "fuel_cost", "energy_cost", "co2_kg", "fuel_savings"):
                 k[key] = round(k[key], 1)
             status_counts = {}
             for v in self.vehicles.values():
