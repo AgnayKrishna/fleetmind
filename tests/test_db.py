@@ -106,6 +106,7 @@ def test_gtm_leads_seeded_and_status_survives_restart():
 def test_history_endpoint():
     from backend.app import app
     client = TestClient(app)
+    client.post("/api/auth/login", json={"username": "admin", "password": "fleetmind-admin"})
     r = client.get("/api/history/orders?limit=5")
     assert r.status_code == 200 and r.json()["ok"] and 0 < len(r.json()["orders"]) <= 5
     assert client.get("/api/history/decisions").status_code == 200

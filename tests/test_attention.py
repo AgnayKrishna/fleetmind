@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from backend.app import app  # noqa: E402
 
 client = TestClient(app)
+client.post("/api/auth/login", json={"username": "admin", "password": "fleetmind-admin"})   # logistics_admin
 
 
 def test_state_has_attention_fields():

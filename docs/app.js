@@ -1,5 +1,5 @@
 const params = new URLSearchParams(location.search);
-const API = (params.get("api") || window.FLEET_API_URL || "").replace(/\/$/, "");
+const API = FM.API;                     // auth.js: backend URL, sign-in and the session token
 let KEY = params.get("key") || sessionStorage.getItem("fleetKey") || "";
 if (KEY) sessionStorage.setItem("fleetKey", KEY);
 const STATUS_COLOR = { to_pickup: "var(--ok)", to_dropoff: "var(--ok)", to_depot: "var(--ok)", to_fuel: "var(--warn)", routing: "var(--accent)",
@@ -21,14 +21,24 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "
 
 async function api(path, body) {
   const r = await fetch(API + path, body ? { method: "POST", headers: { "Content-Type": "application/json",
-    "X-Demo-Key": KEY }, body: JSON.stringify(body) } : {});
-  if (r.status === 401 && body) {
-    const k = prompt("Demo password:");
-    if (k) { KEY = k.trim(); sessionStorage.setItem("fleetKey", KEY); return api(path, body); }
+    "X-Demo-Key": KEY, ...FM.headers() }, body: JSON.stringify(body) } : { headers: FM.headers() });
+  if (r.status === 401) {
+    const err = (await r.clone().json().catch(() => ({}))).error || "";
+    if (err === "login required") { await FM.requireLogin(); return api(path, body); }   // session expired
+    if (body) {
+      const k = prompt("Demo password:");
+      if (k) { KEY = k.trim(); sessionStorage.setItem("fleetKey", KEY); return api(path, body); }
+    }
+  }
+  if (r.status === 403 && body) {
+    const err = (await r.clone().json().catch(() => ({}))).error;
+    if (err) alert(err);
   }
   if (!r.ok) throw new Error(r.status);
   return r.json();
 }
+const canOps = () => ["superadmin", "logistics_admin"].includes(FM.user?.role);
+const isSuper = () => FM.user?.role === "superadmin";
 
 // ---------- map ----------
 const map = L.map("map", { zoomControl: true }).setView([56.95, 24.3], 8);
@@ -222,7 +232,8 @@ function drawApprovals(s) {
       <p>${esc(a.summary)}</p>
       ${a.options.map(o => `<label><input type="radio" name="${a.id}" value="${o.id}" ${o.id === a.recommended ? "checked" : ""}>
         <span>${esc(o.label)}${o.id === a.recommended ? '<span class="rec">RECOMMENDED</span>' : ""}<small>${esc(o.detail || "")}</small></span></label>`).join("")}
-      <div class="btns"><button class="approve">Approve</button><button class="reject">Reject</button></div>
+      ${canOps() ? `<div class="btns"><button class="approve">Approve</button><button class="reject">Reject</button></div>`
+        : `<p class="note">A logistics admin decides this one.</p>`}
     </div>`).join("");
 }
 
@@ -256,7 +267,7 @@ function attentionItems(s) {
         btn: "Show", act: "vehicle", id: v.id });
     if (v.energy_pct < LOW_ENERGY_PCT && !v.fuel_stop && !["refuel", "broken", "service"].includes(v.status)) {
       // The Fuel & Cost Agent's pick: cheapest diesel near the route, or the nearest charger for EVs.
-      const st = v.energy_stop, ev = v.unit === "kWh";
+      const st = canOps() ? v.energy_stop : null, ev = v.unit === "kWh";
       const btn = !st ? "Show" : ev ? `Charge now · ${st.minutes} min` : `Refuel now · €${st.price_eur_l.toFixed(2)}/L`;
       items.push({ c: "var(--fuel)", kind: "Low energy", text: `${v.id} · ${v.energy_pct}% (${v.range_km} km)`,
         btn, act: st ? "energy" : "vehicle", id: v.id,
@@ -398,7 +409,7 @@ function drawChart(s) {
 
 // ---------- right column tabs ----------
 function showTab(name) {
-  if (REF) name = "ops";                      // prospects only ever see the operations view
+  if (REF || !isSuper()) name = "ops";        // prospects and non-superadmins only see the operations view
   $("#paneOps").classList.toggle("hidden", name !== "ops");
   $("#paneGtm").classList.toggle("hidden", name !== "gtm");
   document.querySelectorAll(".tab").forEach(t => {
@@ -503,14 +514,17 @@ $("#gtmList").addEventListener("click", async e => {
   }
 });
 
-if (REF) {
-  $("#tabs").classList.add("hidden");
-  $("#paneGtm").classList.add("hidden");
-  if (!sessionStorage.getItem("fmRef")) {   // one open per browser tab session; the backend also de-dupes
-    sessionStorage.setItem("fmRef", REF);
-    api("/api/gtm/open", { ref: REF }).catch(() => {});
+if (REF && !sessionStorage.getItem("fmRef")) {   // one open per browser tab session; the backend also de-dupes
+  sessionStorage.setItem("fmRef", REF);
+  api("/api/gtm/open", { ref: REF }).catch(() => {});   // open endpoint: counts before the prospect signs in
+}
+function startGtm() {
+  if (REF || !isSuper()) {                        // the GTM tab is for the superadmin only
+    $("#tabs").classList.add("hidden");
+    $("#paneGtm").classList.add("hidden");
+    showTab("ops");
+    return;
   }
-} else {
   pollGtm(); setInterval(pollGtm, 4000);
   let saved = null; try { saved = localStorage.getItem("fmTab"); } catch { /* ignore */ }
   showTab(saved === "gtm" ? "gtm" : "ops");
@@ -529,7 +543,13 @@ async function poll() {
     if (++failures > 2) { $("#apiUrl").textContent = API || location.origin; $("#offline").classList.remove("hidden"); }
   }
 }
-setInterval(poll, 1500); poll();
+// Sign in first (auth.js); drivers are sent to their phone view, everyone else gets the dashboard
+// with only the buttons their role may use. The backend enforces the same rules on every endpoint.
+FM.boot("dashboard").then(() => {
+  approvalsKey = ""; attnKey = "";
+  startGtm();
+  setInterval(poll, 1500); poll();
+});
 
 // ---------- controls ----------
 document.querySelectorAll(".events button").forEach(b => b.addEventListener("click", async () => {

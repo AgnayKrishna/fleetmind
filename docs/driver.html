@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1017">
+<title>FleetMind · Driver</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="driver.css">
+</head>
+<body class="driver-app">
+<header class="d-top">
+  <div class="brand"><div class="logo">FM</div><div><h1 id="dVehicle">FleetMind</h1><p id="dClock">Driver app</p></div></div>
+  <button id="logoutBtn" class="hidden">Sign out</button>
+</header>
+
+<main class="d-main" id="dMain" aria-live="polite">
+  <section class="d-card" id="dStop">
+    <h2>Next stop</h2>
+    <p class="d-big" id="dStopName">Loading…</p>
+    <p class="d-sub" id="dStopInfo"></p>
+    <a class="d-link hidden" id="dNav" target="_blank" rel="noopener">Open in maps</a>
+  </section>
+
+  <section class="d-actions" aria-label="Job steps">
+    <button class="d-btn" data-action="arrived" disabled><span>📍</span>Arrived</button>
+    <button class="d-btn" data-action="loaded" disabled><span>📦</span>Loaded</button>
+    <button class="d-btn" data-action="delivered" disabled><span>✅</span>Delivered</button>
+  </section>
+  <p class="d-msg hidden" id="dMsg" role="status"></p>
+
+  <section class="d-card" id="dJob">
+    <h2>Job</h2>
+    <div id="dJobBody"><p class="d-sub">No job right now. Dispatch will send you one.</p></div>
+  </section>
+
+  <section class="d-card" id="dVeh">
+    <h2>Vehicle</h2>
+    <div id="dVehBody"></div>
+  </section>
+
+  <section class="d-card d-problem">
+    <button class="d-report" id="dReport">⚠️ Report a problem</button>
+    <form id="dProblemForm" class="hidden">
+      <label for="dNote">What's wrong?</label>
+      <textarea id="dNote" rows="3" maxlength="300" placeholder="e.g. warning light, flat tyre, strange noise"></textarea>
+      <div class="d-row">
+        <button type="button" id="dCancel" class="d-sec">Cancel</button>
+        <button type="submit" class="d-danger">Send report</button>
+      </div>
+      <p class="d-sub">The Maintenance Agent plans the repair and Dispatch moves your load if needed.</p>
+    </form>
+  </section>
+</main>
+
+<div id="login" class="login hidden" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+  <form id="loginForm" class="login-card">
+    <div class="brand"><div class="logo">FM</div><div><h1 id="loginTitle">Sign in to FleetMind</h1><p>Driver app</p></div></div>
+    <label>Username <input id="loginUser" autocomplete="username" required></label>
+    <label>Password <input id="loginPass" type="password" autocomplete="current-password" required></label>
+    <p class="login-err hidden" id="loginErr"></p>
+    <button type="submit" class="primary">Sign in</button>
+    <h2>Demo accounts</h2>
+    <p class="note">Click one to fill the form. These are public demo passwords.</p>
+    <div id="demoAccounts" class="demo-accounts"></div>
+  </form>
+</div>
+
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="driver.js"></script>
+</body>
+</html>

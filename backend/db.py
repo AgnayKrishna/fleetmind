@@ -16,7 +16,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import JSON, Boolean, Float, Integer, String, Text, create_engine, func, select
+from sqlalchemy import JSON, Boolean, Float, Integer, String, Text, create_engine, func, inspect, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 DEFAULT_URL = f"sqlite:///{Path(__file__).resolve().parent / 'fleetmind.db'}"
@@ -63,6 +63,7 @@ class Approval(Base):
     decision: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_sim: Mapped[str] = mapped_column(String(16))
     decided_sim: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    decided_by: Mapped[str | None] = mapped_column(String(120), nullable=True)   # "name (username, role)"
     data: Mapped[dict] = mapped_column(JSON)          # options, notes, fallback
     updated_at: Mapped[str] = mapped_column(String(32))
 
@@ -91,6 +92,16 @@ class Lead(Base):
     updated_at: Mapped[str] = mapped_column(String(32))
 
 
+class User(Base):
+    __tablename__ = "users"
+    username: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    role: Mapped[str] = mapped_column(String(32))
+    password_hash: Mapped[str] = mapped_column(String(256))
+    vehicle_id: Mapped[str | None] = mapped_column(String(16), nullable=True)   # drivers only
+    created_at: Mapped[str] = mapped_column(String(32))
+
+
 def _seq(id_str):
     m = re.search(r"\d+", id_str or "")
     return int(m.group()) if m else 0
@@ -106,6 +117,7 @@ class Store:
         self.engine = create_engine(url, connect_args={"check_same_thread": False, "timeout": 15}
                                     if url.startswith("sqlite") else {})
         Base.metadata.create_all(self.engine)
+        self._migrate()
         self.run = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
         self.wlock = threading.Lock()    # one writer at a time
         self.slock = threading.Lock()    # one sync at a time (background thread + API)
@@ -116,6 +128,30 @@ class Store:
             # approvals left pending by the previous run can't be applied any more
             for a in s.scalars(select(Approval).where(Approval.state == "pending")):
                 a.state, a.updated_at = "expired", _now()
+
+    def _migrate(self):
+        """Add columns that newer versions introduced to a database made by an older one."""
+        insp = inspect(self.engine)
+        have = {c["name"] for c in insp.get_columns("approvals")}
+        if "decided_by" not in have:
+            with self.engine.begin() as con:
+                con.execute(text("ALTER TABLE approvals ADD COLUMN decided_by VARCHAR(120)"))
+
+    # ---------- users ----------
+    def seed_users(self, users, hasher):
+        """First start: create the demo accounts (passwords hashed). Existing accounts are left alone."""
+        with self.wlock, Session(self.engine) as s, s.begin():
+            for u in users:
+                if s.get(User, u["username"]) is None:
+                    s.add(User(username=u["username"], name=u["name"], role=u["role"],
+                               password_hash=hasher(u["password"]), vehicle_id=u.get("vehicle_id"),
+                               created_at=_now()))
+
+    def get_user(self, username):
+        with Session(self.engine) as s:
+            u = s.get(User, (username or "").strip().lower())
+            return None if u is None else {"username": u.username, "name": u.name, "role": u.role,
+                                           "password_hash": u.password_hash, "vehicle_id": u.vehicle_id}
 
     # ---------- start-up ----------
     def next_seq(self):
@@ -197,6 +233,7 @@ class Store:
                 row.event, row.title, row.summary = a.get("event", ""), a.get("title", ""), a.get("summary", "")
                 row.state, row.recommended = a.get("state", "pending"), a.get("recommended")
                 row.decision, row.decided_sim = a.get("decision"), a.get("decided_at")
+                row.decided_by = a.get("decided_by")
                 row.created_sim = a.get("created", "")
                 row.data = json.loads(_fingerprint({k: a.get(k) for k in ("options", "notes", "fallback")}))
                 row.updated_at = now

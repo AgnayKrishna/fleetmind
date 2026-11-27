@@ -99,6 +99,7 @@ def test_no_button_when_energy_is_fine():
 
 def test_energy_stop_endpoint():
     client = TestClient(app)
+    assert client.post("/api/auth/login", json={"username": "admin", "password": "fleetmind-admin"}).status_code == 200
     with app_world.lock:
         v = next(x for x in app_world.vehicles.values() if x["energy_type"] == "diesel" and x["status"] == "idle")
         v["energy"] = v["tank"] * 0.15

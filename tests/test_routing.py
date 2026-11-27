@@ -164,6 +164,7 @@ def test_tile_proxy_keeps_key_on_server(net, monkeypatch):
     from fastapi.testclient import TestClient
     from backend.app import app
     client = TestClient(app)
+    client.post("/api/auth/login", json={"username": "employee", "password": "fleetmind-employee"})
     assert client.get("/api/map/tile/basic/8/145/78.png").status_code == 404      # no key: OpenFreeMap
     assert client.get("/api/state").json()["map"]["tomtom_tiles"] is False
     monkeypatch.setenv("TOMTOM_API_KEY", "tt-test")

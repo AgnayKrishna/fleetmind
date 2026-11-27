@@ -317,7 +317,7 @@ class World:
         return (v["energy"] / v["tank"] * 100 < LOW_ENERGY_PCT and not v.get("fuel_stop")
                 and (v["status"] in MOVING or v["status"] in ("idle", "routing")))
 
-    def add_energy_stop(self, vid, station_id=None):
+    def add_energy_stop(self, vid, station_id=None, by=None):
         """One tap from the dashboard: add the suggested (or a chosen) station as the next stop.
         Low risk under the company policy, so it is applied straight away; the vehicle resumes its
         trip after refuelling / charging."""
@@ -346,10 +346,78 @@ class World:
         else:
             text = (f"{vid}: charging stop added at {st['name']} ({st['kw']} kW, about {st['minutes']} min for "
                     f"{st['kwh']} kWh, +{st['detour_km']} km detour).")
-        self.add_log("Fleet manager", f"Tapped '{'Refuel' if v['energy_type'] == 'diesel' else 'Charge'} now' for {vid}.",
-                     "approval")
+        self.add_log("Fleet manager", f"{by or 'Fleet manager'} tapped "
+                     f"'{'Refuel' if v['energy_type'] == 'diesel' else 'Charge'} now' for {vid}.", "approval")
         self.add_log("Fuel & Cost Agent", text + " Low risk, applied.", "decision")
         return {"ok": True, "vehicle": vid, "stop": {k: st[k] for k in st if k != "score"}}
+
+    # ---------------- driver phone view ----------------
+    DRIVER_ACTIONS = {"arrived": "Arrived", "loaded": "Loaded", "delivered": "Delivered"}
+
+    def _driver_allowed(self, v):
+        st = v["status"]
+        return {"arrived": st in MOVING, "loaded": st == "loading", "delivered": st == "unloading"}
+
+    def driver_view(self, vid):
+        """What the driver's phone shows: their vehicle, job, next stop and which buttons work now."""
+        with self.lock:
+            v = self.vehicles.get(vid)
+            if not v:
+                return None
+            job = self.jobs.get(v["job_id"]) if v["job_id"] else None
+            st = v["status"]
+            nxt = self.target_of(v)
+            if not nxt and job and st == "loading":
+                nxt = job.get("transfer_from") or job["pickup"]
+            elif not nxt and job and st == "unloading":
+                nxt = job["dropoff"]
+            what = {"to_pickup": "Pick up", "to_dropoff": "Deliver", "to_fuel": "Refuel / charge",
+                    "to_depot": "Return to depot", "loading": "Loading at", "unloading": "Unloading at"}
+            return {
+                "vehicle": {"id": v["id"], "label": v["label"], "driver": v["driver"], "status": st,
+                            "energy_pct": round(100 * v["energy"] / v["tank"]), "unit": v["unit"],
+                            "range_km": round(self.range_km(v)), "health": v["health"], "fault": v["fault"],
+                            "drive_today_h": round(v["drive_today"] / 60, 1),
+                            "hours_left_h": round(max(0, DAILY_DRIVE_MAX - v["drive_today"]) / 60, 1),
+                            "since_break_h": round(v["drive_since_break"] / 60, 1)},
+                "job": None if not job else {
+                    "id": job["id"], "cargo": job["cargo"], "weight": job["weight"], "priority": job["priority"],
+                    "status": job["status"], "pickup": job["pickup"]["name"], "dropoff": job["dropoff"]["name"],
+                    "deadline": clock_str(job["window_end"])[-5:], "hazmat": bool(job.get("hazmat"))},
+                "next_stop": None if not nxt else {"action": what.get(st if st != "routing" else v["after_route"], "Go to"),
+                                                   "name": nxt["name"], "lat": nxt["lat"], "lon": nxt["lon"]},
+                "trip": self._trip_info(v),
+                "allowed": self._driver_allowed(v),
+                "clock": clock_str(self.sim),
+            }
+
+    def driver_action(self, vid, action, by="driver"):
+        """Arrived / Loaded / Delivered from the driver's phone. Only valid in the matching state."""
+        with self.lock:
+            v = self.vehicles.get(vid)
+            if not v or action not in self.DRIVER_ACTIONS:
+                return {"ok": False, "error": "unknown vehicle or action"}
+            if not self._driver_allowed(v)[action]:
+                return {"ok": False, "error": f"'{self.DRIVER_ACTIONS[action]}' doesn't fit right now "
+                                              f"({v['status'].replace('_', ' ')})."}
+            if action == "arrived":
+                target = self.target_of(v)
+                if v["route"]:
+                    v["pos_km"] = v["route_km"]
+                    v["lat"], v["lon"] = v["route"][-1][0], v["route"][-1][1]
+                elif target:
+                    v["lat"], v["lon"] = target["lat"], target["lon"]
+                where = target["name"] if target else "the stop"
+                self._arrive(v)
+                text = f"{vid}: driver {v['driver']} confirmed arrival at {where}."
+            else:
+                job_id = v["job_id"]
+                self._finish_phase(v)       # loading -> in transit, unloading -> delivered
+                text = (f"{vid}: driver {v['driver']} confirmed {'loading' if action == 'loaded' else 'delivery'}"
+                        f"{f' of {job_id}' if job_id else ''}.")
+            status = v["status"]
+        self.add_log("Dispatch Agent", text + f" (from the driver app, {by})", "decision")
+        return {"ok": True, "status": status}
 
     # ---------------- per-tick update ----------------
     def speed_factor(self, v):

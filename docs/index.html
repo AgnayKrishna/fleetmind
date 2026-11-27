@@ -25,12 +25,29 @@
     <div class="chip mode" id="mode">Agents --</div>
   </div>
   <div class="controls">
+    <span class="ops-only">
     <button id="pause" title="Pause / resume">❚❚</button>
     <button class="spd" data-v="1">1×</button>
     <button class="spd" data-v="2">2×</button>
     <button class="spd" data-v="5">5×</button>
+    </span>
+    <span class="chip user hidden" id="userChip"></span>
+    <button id="logoutBtn" class="hidden" title="Sign out">Sign out</button>
   </div>
 </header>
+
+<div id="login" class="login hidden" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+  <form id="loginForm" class="login-card">
+    <div class="brand"><div class="logo">FM</div><div><h1 id="loginTitle">Sign in to FleetMind</h1><p>Multi-agent fleet control · Riga, Latvia</p></div></div>
+    <label>Username <input id="loginUser" autocomplete="username" required></label>
+    <label>Password <input id="loginPass" type="password" autocomplete="current-password" required></label>
+    <p class="login-err hidden" id="loginErr"></p>
+    <button type="submit" class="primary">Sign in</button>
+    <h2>Demo accounts</h2>
+    <p class="note">Click one to fill the form. These are public demo passwords.</p>
+    <div id="demoAccounts" class="demo-accounts"></div>
+  </form>
+</div>
 
 <section class="attn" id="attn" aria-label="Needs your attention">
   <h2>Needs your attention <span class="count zero" id="attnCount">0</span></h2>
@@ -54,10 +71,10 @@
   <aside>
     <div class="tabs" id="tabs" role="tablist">
       <button class="tab on" id="tabOps" data-tab="ops" role="tab" aria-selected="true">Operations</button>
-      <button class="tab" id="tabGtm" data-tab="gtm" role="tab" aria-selected="false">GTM outreach <span id="gtmTabCount"></span></button>
+      <button class="tab super-only" id="tabGtm" data-tab="gtm" role="tab" aria-selected="false">GTM outreach <span id="gtmTabCount"></span></button>
     </div>
     <div class="tabpane" id="paneOps" role="tabpanel">
-    <div class="panel">
+    <div class="panel ops-only">
       <h2>Trigger an event</h2>
       <div class="events">
         <button data-ev="traffic"><b>🚧 Traffic jam</b><small>Route Agent reroutes</small></button>
@@ -118,6 +135,7 @@
 <script src="vendor/leaflet-maplibre-gl.js"></script>
 <script src="vendor/chart.umd.js"></script>
 <script src="config.js"></script>
+<script src="auth.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

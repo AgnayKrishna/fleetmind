@@ -175,3 +175,30 @@ tr { cursor: pointer; } tr:hover td { background: var(--panel2); }
 .mail span { color: var(--muted); display: inline-block; width: 52px; }
 .mail pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.45 Inter, sans-serif; margin: 6px 0 0; max-height: 240px; overflow: auto; }
 .lead .note { margin: 0; color: var(--muted); font-size: 11px; }
+
+/* ---------- sign-in and roles ---------- */
+body[data-role="employee"] .ops-only, body[data-role="driver"] .ops-only { display: none !important; }
+body:not([data-role="superadmin"]) .super-only { display: none !important; }
+.appr .note { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+.controls .chip.user { font-family: Inter, system-ui, sans-serif; margin-left: 6px; }
+#logoutBtn { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+.login { position: fixed; inset: 0; z-index: 5000; display: grid; place-items: center; padding: 16px;
+  background: rgba(5, 9, 14, .86); backdrop-filter: blur(4px); }
+.login-card { width: min(440px, 100%); background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 22px; display: flex; flex-direction: column; gap: 12px; max-height: 100%; overflow: auto; }
+.login-card label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 12px; }
+.login-card input { background: var(--panel2); border: 1px solid var(--line); color: var(--text); border-radius: 8px;
+  padding: 10px; font: inherit; font-size: 16px; }
+.login-card input:focus-visible, .login-card button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.login-card button.primary { background: var(--accent); color: #04111f; border: 0; border-radius: 8px; padding: 11px;
+  font-weight: 600; font-size: 14px; min-height: 44px; }
+.login-card h2 { margin: 6px 0 0; }
+.login-card .note { margin: 0; color: var(--muted); font-size: 12px; }
+.login-err { margin: 0; color: var(--bad); font-size: 13px; }
+.demo-accounts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.demo-acc { text-align: left; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px;
+  display: flex; flex-direction: column; gap: 2px; min-height: 44px; }
+.demo-acc:hover { border-color: var(--accent); }
+.demo-acc span { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text); }
+.demo-acc small { color: var(--muted); font-size: 11px; }
+@media (max-width: 420px) { .demo-accounts { grid-template-columns: 1fr; } }

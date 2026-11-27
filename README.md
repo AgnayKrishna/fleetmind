@@ -60,6 +60,14 @@ The badge at the top should say **🤖 Claude · sonnet + haiku**. If it says **
 
 Settings (environment variables): `AGENT_MODE` = `auto` / `claude` / `rules`, `ORCHESTRATOR_MODEL` (default `sonnet`), `SPECIALIST_MODEL` (default `haiku`), `DATABASE_URL` (default: SQLite file `backend/fleetmind.db`).
 
+**Logins and roles.** Everyone signs in. The demo accounts are listed on the login page, and their passwords are public (`backend/auth.py`). Passwords are stored as salted PBKDF2 hashes, and a session lasts 12 h (cookie, or a bearer token when the page is on another origin). Roles are checked on every API endpoint, and any endpoint not in `auth.PERMISSIONS` is refused.
+- `superadmin` can do everything, including the GTM tab
+- `logistics_admin` runs fleet operations: events, approvals, refuel stops, sim controls, chat and history
+- `employee` gets a read-only dashboard plus chat
+- `driver` (`driver` → LV-T01, `driver2` → LV-V01) gets the phone view `driver.html`: vehicle, job, next stop, **Arrived / Loaded / Delivered**, and **Report a problem**, which starts the breakdown pipeline
+
+The approval log and database record who approved each decision.
+
 **Claude API mode (paid key).** `AGENT_MODE=api` uses the official `anthropic` SDK with `ANTHROPIC_API_KEY` from the environment. Never commit the key. The Orchestrator, chat and GTM run on Sonnet (`API_ORCHESTRATOR_MODEL`, default `claude-sonnet-5-5`); the specialists run on Haiku (`API_SPECIALIST_MODEL`, default `claude-haiku-5-5`). If a call fails, that decision falls back to the rules engine. Every call is logged with its tokens and estimated cost, and the totals appear on the mode badge (hover for details) and in `/api/health`. Set the prices with `API_PRICE_ORCHESTRATOR_IN/OUT` and `API_PRICE_SPECIALIST_IN/OUT` (USD per million tokens). The defaults are estimates. `run.bat` / `run.sh` clear `ANTHROPIC_API_KEY`, so start API mode with `uvicorn backend.app:app` yourself.
 
 **Truck routing and live traffic (powered by TomTom).** Put `TOMTOM_API_KEY` and, optionally, `HERE_API_KEY` in `.env`. Never commit them. Routes are planned as truck routes using each vehicle's height, width, length, weight (empty plus load), axle count and hazmat flag (fertiliser loads count as hazmat), with live traffic in the ETA. `ROUTING_PROVIDER` = `tomtom` / `here` / `osrm` picks the first provider. TomTom is the main one, HERE the automatic backup and OSRM the last fallback; with no keys everything runs on OSRM as before. With a TomTom key, the map uses TomTom tiles with a live traffic layer, proxied through `/api/map/tile/...` so the key stays on the server. Without one, it uses OpenFreeMap. The vehicle popup shows which service planned each route.

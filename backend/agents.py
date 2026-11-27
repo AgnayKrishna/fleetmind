@@ -56,8 +56,10 @@ class AgentTeam:
         self.pool.submit(self._safe, handlers[kind], vehicle_id, source)
         return {"ok": True, "event": kind}
 
-    def resolve(self, appr_id, option_id, approved=True):
+    def resolve(self, appr_id, option_id, approved=True, by=None):
+        """by: the logged-in user who decided ({"name", "username", "role"}), stored and logged."""
         w = self.w
+        who = f"{by['name']} ({by['username']}, {by['role']})" if by else "Fleet manager"
         with w.lock:
             a = w.approvals.get(appr_id)
             if not a or a["state"] != "pending":
@@ -69,13 +71,14 @@ class AgentTeam:
                 if option_id not in [o["id"] for o in a["options"]]:
                     option_id = a["recommended"]
                 a["state"] = "approved"
-            a["decision"], a["decided_at"] = option_id, clock_str(w.sim)
+            a["decision"], a["decided_at"], a["decided_by"] = option_id, clock_str(w.sim), who
             w.kpi["approvals_done"] += 1
         label = next((o["label"] for o in a["options"] if o["id"] == option_id), option_id)
-        w.add_log("Fleet manager", f"{'Approved' if approved else 'Rejected'}: {a['title']} -> {label}", "approval")
+        w.add_log("Fleet manager", f"{'Approved' if approved else 'Rejected'} by {who}: {a['title']} -> {label}",
+                  "approval")
         if option_id:
             a["apply"](option_id)
-        return {"ok": True}
+        return {"ok": True, "decided_by": who}
 
     # ================= pipeline =================
     def _safe(self, fn, *args):
@@ -333,7 +336,7 @@ class AgentTeam:
                 cands = w.dispatch_candidates(job, origin=job.get("transfer_from"), limit=3)
             else:
                 cands = []
-        src = "Telematics sensor" if source == "sensor" else "Dashboard"
+        src = {"sensor": "Telematics sensor", "driver": "Driver report"}.get(source, "Dashboard")
         w.add_log("Maintenance Agent", f"{src}: {v['id']} ({v['label']}) broke down: {fault}. "
                   f"Estimated repair {repair_min} min + tow, about EUR {total_cost}.", "alert")
         if not job:

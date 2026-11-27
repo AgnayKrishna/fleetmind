@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import llm, services
+from . import auth, llm, services
 from .agents import AGENTS, AgentTeam
 from .db import Store
 from .gtm import GtmAgent
@@ -35,6 +35,8 @@ job_seq, appr_seq = store.next_seq()
 world = World(seed=int(os.getenv("SEED", "7")), job_seq=job_seq, appr_seq=appr_seq)
 team = AgentTeam(world)
 gtm = GtmAgent(world, store)
+store.seed_users(auth.DEMO_USERS, auth.hash_password)
+sessions = auth.Sessions()
 threading.Thread(target=world.run_forever, daemon=True).start()
 store.start(world)
 world.add_log("Orchestrator", f"FleetMind online with {len(world.vehicles)} vehicles. Agent mode: "
@@ -53,11 +55,115 @@ DEMO_KEY = os.getenv("DEMO_KEY", "").strip()
 async def require_key(request: Request, call_next):
     # /api/gtm/open stays open: prospects arriving from an email link don't have the key.
     if (DEMO_KEY and request.method == "POST" and request.url.path.startswith("/api/")
-            and request.url.path != "/api/gtm/open"):
+            and request.url.path != "/api/gtm/open" and not request.url.path.startswith("/api/auth/")):
         given = request.headers.get("x-demo-key") or request.query_params.get("key")
         if given != DEMO_KEY:
             return JSONResponse({"ok": False, "error": "wrong or missing demo key"}, status_code=401)
     return await call_next(request)
+
+
+@app.middleware("http")
+async def require_role(request: Request, call_next):
+    """Logins and roles on every /api endpoint (see auth.PERMISSIONS). Not listed = refused."""
+    path = request.url.path
+    if request.method == "OPTIONS" or not path.startswith("/api/"):
+        return await call_next(request)        # CORS preflight and the static dashboard files
+    found, roles = auth.rule_for(request.method, path)
+    if not found:
+        return JSONResponse({"ok": False, "error": "not allowed"}, status_code=403)
+    user = sessions.get(auth.token_from(request))
+    request.state.user = user
+    if roles is auth.OPEN:
+        return await call_next(request)
+    if not user:
+        return JSONResponse({"ok": False, "error": "login required"}, status_code=401)
+    if user["role"] not in roles:
+        return JSONResponse({"ok": False, "error": f"your role ({user['role']}) can't do this"}, status_code=403)
+    return await call_next(request)
+
+
+class LoginIn(BaseModel):
+    username: str
+    password: str
+
+
+@app.get("/api/auth/demo-accounts")
+def demo_accounts():
+    """Shown on the login page. Demo only: these passwords are public."""
+    return {"accounts": [{k: u[k] for k in ("username", "password", "name", "role")} | {"vehicle_id": u.get("vehicle_id")}
+                         for u in auth.DEMO_USERS]}
+
+
+@app.post("/api/auth/login")
+def login(body: LoginIn, request: Request):
+    u = store.get_user(body.username[:64])
+    if not u or not auth.verify_password(body.password[:200], u["password_hash"]):
+        return JSONResponse({"ok": False, "error": "wrong username or password"}, status_code=401)
+    token = sessions.create(u)
+    user = {k: u[k] for k in ("username", "name", "role", "vehicle_id")}
+    world.add_log("Orchestrator", f"{u['name']} signed in ({u['role']}).", "info")
+    r = JSONResponse({"ok": True, "token": token, "user": user})
+    https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+    r.set_cookie(auth.COOKIE, token, max_age=auth.SESSION_TTL_S, httponly=True, samesite="lax", secure=https)
+    return r
+
+
+@app.post("/api/auth/logout")
+def logout(request: Request):
+    sessions.drop(auth.token_from(request))
+    r = JSONResponse({"ok": True})
+    r.delete_cookie(auth.COOKIE)
+    return r
+
+
+@app.get("/api/auth/me")
+def me(request: Request):
+    return {"ok": True, "user": request.state.user}
+
+
+# ---------- driver phone view ----------
+class DriverActionIn(BaseModel):
+    action: str            # arrived | loaded | delivered
+
+
+class ProblemIn(BaseModel):
+    note: str = ""
+
+
+def _driver_vehicle(request):
+    vid = request.state.user.get("vehicle_id")
+    return vid if vid in world.vehicles else None
+
+
+@app.get("/api/driver/me")
+def driver_me(request: Request):
+    vid = _driver_vehicle(request)
+    if not vid:
+        return JSONResponse({"ok": False, "error": "no vehicle is linked to this driver account"}, status_code=404)
+    return {"ok": True, "user": request.state.user} | world.driver_view(vid)
+
+
+@app.post("/api/driver/action")
+def driver_action(a: DriverActionIn, request: Request):
+    vid = _driver_vehicle(request)
+    if not vid:
+        return JSONResponse({"ok": False, "error": "no vehicle is linked to this driver account"}, status_code=404)
+    r = world.driver_action(vid, a.action, by=request.state.user["name"])
+    return r if r["ok"] else JSONResponse(r, status_code=409)
+
+
+@app.post("/api/driver/problem")
+def driver_problem(p: ProblemIn, request: Request):
+    """'Report a problem': runs the same breakdown pipeline as a sensor alert or the dashboard button."""
+    vid = _driver_vehicle(request)
+    if not vid:
+        return JSONResponse({"ok": False, "error": "no vehicle is linked to this driver account"}, status_code=404)
+    if world.vehicles[vid]["status"] == "broken":
+        return JSONResponse({"ok": False, "error": "already reported: the Maintenance Agent is on it"}, status_code=409)
+    note = " ".join(p.note.split())[:300]
+    world.add_log("Fleet manager", f"Driver {request.state.user['name']} reported a problem on {vid}"
+                  + (f": \"{note}\"" if note else "."), "alert")
+    return team.trigger("breakdown", vid, source="driver")
 
 
 class EventIn(BaseModel):
@@ -85,13 +191,19 @@ def health():
 
 
 @app.get("/api/state")
-def state(since: int = 0):
+def state(request: Request, since: int = 0):
     s = world.snapshot(log_after=since)
     s["approvals"] = [{k: v for k, v in a.items() if k != "apply"} for a in s["approvals"]]
     s["agents"] = llm.status()
     s["agent_roles"] = AGENTS
     s["key_required"] = bool(DEMO_KEY)
-    s["gtm_kpi"] = gtm.kpi()
+    user = request.state.user
+    s["user"] = user
+    if user["role"] == "superadmin":
+        s["gtm_kpi"] = gtm.kpi()
+    else:      # sales outreach is for the superadmin only
+        s["gtm_kpi"] = None
+        s["log"] = [e for e in s["log"] if e["agent"] != "GTM Agent"]
     return s
 
 
@@ -142,8 +254,8 @@ def event(e: EventIn):
 
 
 @app.post("/api/approvals/{aid}")
-def approve(aid: str, a: ApprovalIn):
-    return team.resolve(aid, a.option_id, a.approve)
+def approve(aid: str, a: ApprovalIn, request: Request):
+    return team.resolve(aid, a.option_id, a.approve, by=request.state.user)
 
 
 class EnergyStopIn(BaseModel):
@@ -151,8 +263,8 @@ class EnergyStopIn(BaseModel):
 
 
 @app.post("/api/vehicles/{vid}/energy_stop")
-def energy_stop(vid: str, e: EnergyStopIn | None = None):
-    r = world.add_energy_stop(vid, e.station_id if e else None)
+def energy_stop(request: Request, vid: str, e: EnergyStopIn | None = None):
+    r = world.add_energy_stop(vid, e.station_id if e else None, by=request.state.user["name"])
     return r if r["ok"] else JSONResponse(r, status_code=409)
 
 
