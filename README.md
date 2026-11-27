@@ -60,6 +60,8 @@ The badge at the top should say **🤖 Claude · sonnet + haiku**. If it says **
 
 Settings (environment variables): `AGENT_MODE` = `auto` / `claude` / `rules`, `ORCHESTRATOR_MODEL` (default `sonnet`), `SPECIALIST_MODEL` (default `haiku`), `DATABASE_URL` (default: SQLite file `backend/fleetmind.db`).
 
+**Claude API mode (paid key).** `AGENT_MODE=api` uses the official `anthropic` SDK with `ANTHROPIC_API_KEY` from the environment. Never commit the key. The Orchestrator, chat and GTM run on Sonnet (`API_ORCHESTRATOR_MODEL`, default `claude-sonnet-5-5`); the specialists run on Haiku (`API_SPECIALIST_MODEL`, default `claude-haiku-5-5`). If a call fails, that decision falls back to the rules engine. Every call is logged with its tokens and estimated cost, and the totals appear on the mode badge (hover for details) and in `/api/health`. Set the prices with `API_PRICE_ORCHESTRATOR_IN/OUT` and `API_PRICE_SPECIALIST_IN/OUT` (USD per million tokens). The defaults are estimates. `run.bat` / `run.sh` clear `ANTHROPIC_API_KEY`, so start API mode with `uvicorn backend.app:app` yourself.
+
 **Saved history.** Orders, approvals, agent decisions and GTM leads are copied to SQLite every 2 seconds and survive a restart. The live simulation itself starts fresh each time. Order and approval numbers continue from where they stopped, and approvals still pending at shutdown are marked `expired`. Read the history at `/api/history/orders`, `/api/history/approvals` or `/api/history/decisions` (`?limit=100&status=...`). On the first start the GTM leads, drafts and statuses are seeded from `docs/leads.json`, `backend/gtm_drafts.json` and `backend/gtm_state.json`.
 
 ## Presenting from another computer (e.g. the university PC)

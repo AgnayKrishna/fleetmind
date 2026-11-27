@@ -33,7 +33,7 @@ FAULTS_EV = [("Battery cooling fault", 180, 600), ("Flat tyre", 45, 120), ("Inve
 
 
 def model_label(role):
-    return f"Claude {llm.MODELS[role].capitalize()} via Claude Code"
+    return llm.model_label(role)
 
 
 class AgentTeam:

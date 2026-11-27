@@ -25,7 +25,7 @@ gtm = GtmAgent(world, store)
 threading.Thread(target=world.run_forever, daemon=True).start()
 store.start(world)
 world.add_log("Orchestrator", f"FleetMind online with {len(world.vehicles)} vehicles. Agent mode: "
-              f"{'Claude (subscription via Claude Code)' if llm.enabled() else 'rules engine'}.")
+              f"{ {'claude': 'Claude (subscription via Claude Code)', 'api': 'Claude API (Sonnet + Haiku)'}.get(llm.status()['mode'], 'rules engine')}.")
 gtm.start()   # drafts only leads that have no saved draft yet
 
 app = FastAPI(title="FleetMind")

@@ -105,7 +105,7 @@ class GtmAgent:
         return d is None or (d.get("source") == "rules" and llm.enabled())
 
     def _draft_all(self, todo):
-        who = "Claude Code" if llm.enabled() else "rules engine"
+        who = {"claude": "Claude Code", "api": "Claude API"}.get(llm.status()["mode"], "rules engine")
         self.w.add_log(AGENT, f"Researching {len(todo)} Latvian freight companies for the FleetMind pilot ({who}).",
                        "info", model=self._model())
         with ThreadPoolExecutor(max_workers=3 if llm.enabled() else 1) as pool:
@@ -190,14 +190,13 @@ JSON keys: score (integer), reason (string), subject (string), body (string)."""
                 f"Best regards,\n{SENDER_NAME}\n{SENDER_EMAIL}\n\n"
                 "Not interested? Just reply \"no thanks\" and I won't contact you again.")
         return {"score": score, "reason": reason, "subject": subject, "body": full, "source": source,
-                "model": (f"Claude {llm.MODELS['orchestrator'].capitalize()} via Claude Code"
-                          if source == "claude" else "rules engine"),
+                "model": llm.model_label("orchestrator") if source == "claude" else "rules engine",
                 "site_read": site_read, "generated": _now()}
 
     def _model(self, draft=None):
         if draft is not None:
             return draft["model"]
-        return f"Claude {llm.MODELS['orchestrator'].capitalize()} via Claude Code" if llm.enabled() else "rules engine"
+        return llm.model_label("orchestrator") if llm.enabled() else "rules engine"
 
     # ---------- statuses and demo opens ----------
     def _save_state(self, lid=None):

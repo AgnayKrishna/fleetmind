@@ -155,6 +155,14 @@ function drawHeader(s) {
     m.textContent = `🤖 Claude · ${a.models.orchestrator} + ${a.models.specialist}`;
     m.className = "chip mode claude";
     m.title = `Running on your Claude subscription via Claude Code.\nCalls: ${a.calls}, errors: ${a.errors}` + (a.last_error ? `\nLast error: ${a.last_error}` : "");
+  } else if (a.mode === "api") {
+    const u = a.usage || {};
+    m.textContent = `🤖 Claude API · $${(u.cost_usd || 0).toFixed(2)}`;
+    m.className = "chip mode claude";
+    m.title = `Claude API: ${a.models.orchestrator} (Orchestrator, GTM) + ${a.models.specialist} (specialists).\n` +
+      `Calls: ${a.calls}, errors: ${a.errors} (failed calls fall back to rules)\n` +
+      `Tokens: ${(u.input_tokens || 0).toLocaleString()} in / ${(u.output_tokens || 0).toLocaleString()} out, estimated cost $${(u.cost_usd || 0).toFixed(4)}` +
+      (a.last_error ? `\nLast error: ${a.last_error}` : "");
   } else { m.textContent = "⚙️ Rules engine"; m.className = "chip mode"; m.title = "No LLM: Claude Code not found or AGENT_MODE=rules"; }
   $("#pause").textContent = s.paused ? "▶" : "❚❚";
   document.querySelectorAll(".spd").forEach(b => b.classList.toggle("on", Number(b.dataset.v) === s.speed));
