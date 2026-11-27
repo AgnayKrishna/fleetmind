@@ -149,3 +149,33 @@ Newest at the bottom.
 6. **Hazmat:** only "fertiliser bags" count as hazmat, as an ADR class 5.1 stand-in. Should any other cargo count?
 
 **Push:** `git push origin nightly` succeeded (`a4acfcd..fd34506`, plus this line). `main` was not touched.
+
+## 2026-11-27 · DAY
+
+**Setup:** working tree was clean, on `nightly`, `git merge main` → already up to date.
+
+**Tests:** `AGENT_MODE=rules .venv/Scripts/python.exe -m pytest tests -q` → **42 passed** (2 new tests). `node --check docs/app.js` → OK. Each task was tested before its commit.
+
+**Done**
+- [x] **Label sample fuel and charger data.**
+  - New `SAMPLE_ENERGY_DATA = True` in `backend/data.py`. While it is True, every station suggestion has `"sample": true`, and each vehicle in `/api/state` has `fuel_stop_sample`. Set it to False once real data is connected and all the labels go away.
+  - The dashboard now shows "Sample data":
+    - as a small dashed tag on the Low energy item in Needs your attention
+    - in the Refuel/Charge button tooltip
+    - on a new "Fuel stop / Charging stop: <station>" line in the vehicle popup, shown while a stop is planned
+  - The Fuel & Cost Agent log lines (stop added, refuelled/charged) end with "[Sample data]".
+- [x] **Count refuel savings.**
+  - When a diesel vehicle finishes a Refuel now stop, `fuel_cost` is corrected from the national average to the station's price for the litres actually bought. The net saving (price difference minus the detour fuel) goes into a new `kpi.fuel_savings`.
+  - The fuel + charging KPI, cost per km and the cost chart now include it. A new KPI tile shows "€X saved at cheaper stations". The rules-mode chat answer about cost mentions it too.
+  - A station dearer than average (when it's the only one on the way) counts as a negative saving, so the figure stays honest.
+
+**Not done / limits**
+- EV charging savings are not counted. Chargers are picked for speed, not price, and electricity cost still uses the €0.40/kWh average. Tell me if you want EV charging costs corrected to the charger's own price too.
+- Auto-refuels at 12 % (without the button) still use the average price, because no station is chosen for them.
+- No browser was available. The dashboard changes are syntax-checked only; nothing was clicked.
+
+**Owner should check**
+- Let a diesel vehicle drop below 20 %. Check the "Sample data" tag and tooltip, tap Refuel now, open the vehicle popup (it should show the stop with the tag), and once it has refuelled check that the "saved at cheaper stations" tile goes up.
+
+**Questions**
+- Is a dashed "Sample data" tag enough, or do you want it more visible (e.g. amber)?
