@@ -69,6 +69,7 @@ class AgentTeam:
                 if option_id not in [o["id"] for o in a["options"]]:
                     option_id = a["recommended"]
                 a["state"] = "approved"
+            a["decision"], a["decided_at"] = option_id, clock_str(w.sim)
             w.kpi["approvals_done"] += 1
         label = next((o["label"] for o in a["options"] if o["id"] == option_id), option_id)
         w.add_log("Fleet manager", f"{'Approved' if approved else 'Rejected'}: {a['title']} -> {label}", "approval")

@@ -29,7 +29,7 @@ def clock_str(sim_min):
 
 
 class World:
-    def __init__(self, seed=7):
+    def __init__(self, seed=7, job_seq=100, appr_seq=0):
         self.rng = random.Random(seed)
         self.lock = threading.RLock()
         self.sim = 6 * 60.0          # starts 06:00
@@ -47,7 +47,7 @@ class World:
                         energy_cost=0.0, co2_kg=0.0, penalties=0.0, repairs=0.0,
                         auto_decisions=0, approvals_done=0, llm_decisions=0)
         self.history = []
-        self.seq = {"job": 100, "log": 0, "appr": 0, "zone": 0}
+        self.seq = {"job": max(100, job_seq), "log": 0, "appr": appr_seq, "zone": 0}   # db continues numbering
         self.next_job_at = self.sim + 20
         self.next_history = self.sim
         self.periodic_hook = None    # set by agents: called with (world, sim) every tick

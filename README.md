@@ -58,7 +58,9 @@ The badge at the top should say **🤖 Claude · sonnet + haiku**. If it says **
 
 > The scripts clear `ANTHROPIC_API_KEY` on purpose, so Claude Code always uses your subscription login and never bills an API key.
 
-Settings (environment variables): `AGENT_MODE` = `auto` / `claude` / `rules`, `ORCHESTRATOR_MODEL` (default `sonnet`), `SPECIALIST_MODEL` (default `haiku`).
+Settings (environment variables): `AGENT_MODE` = `auto` / `claude` / `rules`, `ORCHESTRATOR_MODEL` (default `sonnet`), `SPECIALIST_MODEL` (default `haiku`), `DATABASE_URL` (default: SQLite file `backend/fleetmind.db`).
+
+**Saved history.** Orders, approvals, agent decisions and GTM leads are copied to SQLite every 2 seconds and survive a restart. The live simulation itself starts fresh each time. Order and approval numbers continue from where they stopped, and approvals still pending at shutdown are marked `expired`. Read the history at `/api/history/orders`, `/api/history/approvals` or `/api/history/decisions` (`?limit=100&status=...`). On the first start the GTM leads, drafts and statuses are seeded from `docs/leads.json`, `backend/gtm_drafts.json` and `backend/gtm_state.json`.
 
 ## Presenting from another computer (e.g. the university PC)
 

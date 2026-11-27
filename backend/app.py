@@ -12,14 +12,18 @@ from pydantic import BaseModel
 
 from . import llm
 from .agents import AGENTS, AgentTeam
+from .db import Store
 from .gtm import GtmAgent
 from .sim import World
 
 llm.init()
-world = World(seed=int(os.getenv("SEED", "7")))
+store = Store()
+job_seq, appr_seq = store.next_seq()
+world = World(seed=int(os.getenv("SEED", "7")), job_seq=job_seq, appr_seq=appr_seq)
 team = AgentTeam(world)
-gtm = GtmAgent(world)
+gtm = GtmAgent(world, store)
 threading.Thread(target=world.run_forever, daemon=True).start()
+store.start(world)
 world.add_log("Orchestrator", f"FleetMind online with {len(world.vehicles)} vehicles. Agent mode: "
               f"{'Claude (subscription via Claude Code)' if llm.enabled() else 'rules engine'}.")
 gtm.start()   # drafts only leads that have no saved draft yet
@@ -99,6 +103,15 @@ def gtm_open(o: GtmOpenIn):
 @app.post("/api/gtm/{lead_id}/status")
 def gtm_status(lead_id: str, s: GtmStatusIn):
     return gtm.set_status(lead_id, s.status)
+
+
+@app.get("/api/history/{what}")
+def history(what: str, limit: int = 100, status: str | None = None):
+    """Saved orders, approvals or agent decisions, newest first (kept across restarts)."""
+    if what not in ("orders", "approvals", "decisions"):
+        return JSONResponse({"ok": False, "error": "use orders, approvals or decisions"}, status_code=404)
+    store.sync(world)
+    return {"ok": True, what: store.history(what, limit, status)}
 
 
 @app.post("/api/event")
