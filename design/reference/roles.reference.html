@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FleetMind roles and permissions</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 1280px; height: 900px; box-sizing: border-box; padding: 40px; background: #F2F3F5; font-family: Manrope, sans-serif; color: #18191C; display: flex; flex-direction: column; gap: 18px">
+<div><h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.4px">Who sees and does what</h1><p style="margin: 6px 0 0; font-size: 15px; color: #5E6168">Four roles. Each company sees only its own data; only the super admin sees every company.</p></div>
+<section style="background: #FFFFFF; border-radius: 18px; overflow: hidden; box-shadow: 0 1px 2px rgba(24,25,28,0.06)">
+<div style="display: grid; grid-template-columns: 2fr repeat(4, 1fr); padding: 0 20px; height: 56px; align-items: center; background: #FAFAFB; border-bottom: 1px solid rgba(24,25,28,0.08); font-size: 14px; font-weight: 800">
+<span>Can</span><span>Super admin<br><span style="font-size: 12px; font-weight: 600; color: #5E6168">you, FleetMind</span></span><span>Company admin<br><span style="font-size: 12px; font-weight: 600; color: #5E6168">owner, manager</span></span><span>Dispatcher<br><span style="font-size: 12px; font-weight: 600; color: #5E6168">employee</span></span><span>Driver<br><span style="font-size: 12px; font-weight: 600; color: #5E6168">Telegram, phone page</span></span>
+</div>
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="14"><div style="display: grid; grid-template-columns: 2fr repeat(4, 1fr); padding: 0 20px; height: 44px; align-items: center; font-size: 14px; border-bottom: 1px solid rgba(24,25,28,0.06)">
+<span style="font-weight: 700">{{r.what}}</span>
+<span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: {{r.fg0}}"><span style="width: 18px; height: 18px; border-radius: 6px; background: {{r.bg0}}; display: inline-flex; align-items: center; justify-content: center; font-size: 12px">{{r.icon0}}</span>{{r.text0}}</span><span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: {{r.fg1}}"><span style="width: 18px; height: 18px; border-radius: 6px; background: {{r.bg1}}; display: inline-flex; align-items: center; justify-content: center; font-size: 12px">{{r.icon1}}</span>{{r.text1}}</span><span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: {{r.fg2}}"><span style="width: 18px; height: 18px; border-radius: 6px; background: {{r.bg2}}; display: inline-flex; align-items: center; justify-content: center; font-size: 12px">{{r.icon2}}</span>{{r.text2}}</span><span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: {{r.fg3}}"><span style="width: 18px; height: 18px; border-radius: 6px; background: {{r.bg3}}; display: inline-flex; align-items: center; justify-content: center; font-size: 12px">{{r.icon3}}</span>{{r.text3}}</span>
+</div></sc-for>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+const Y = (t) => ({ icon:'✓', bg:'#DDF2E8', fg:'#13684A', text: t || 'Yes' });
+const N = () => ({ icon:'–', bg:'#ECEDEF', fg:'#8A8F98', text:'No' });
+const L = (t) => ({ icon:'~', bg:'#FCEBCB', fg:'#8F5400', text: t });
+const R = [
+  ['See all customer companies', Y(), N(), N(), N()],
+  ['Billing, plans and invoices from FleetMind', Y(), L('Own company'), N(), N()],
+  ['AI usage and cost', Y('All'), L('Own company'), N(), N()],
+  ['Company settings, users and roles', L('For support'), Y(), N(), N()],
+  ['AI limits: what runs alone, what asks', N(), Y(), N(), N()],
+  ['Map, fleet table, orders', L('Read only'), Y('All trucks'), L('Own trucks'), L('Own truck')],
+  ['Customer prices, revenue, profit', N(), Y(), N(), N()],
+  ['Trip costs and savings', N(), Y(), Y(), N()],
+  ['Approve AI suggestions', N(), Y('Any'), L('Up to €300'), N()],
+  ['Undo AI actions', N(), Y(), L('Own trucks'), N()],
+  ['Create and assign orders', N(), Y(), Y(), N()],
+  ['Message drivers', N(), Y(), Y(), N()],
+  ['Today\'s jobs, navigation, status buttons', N(), N(), N(), Y()],
+  ['Delivery photos and signature', N(), Y('See'), Y('See'), Y('Send')]
+];
+class Component extends DCLogic { renderVals() { return { rows: R.map(([what, ...cells]) => { const o = { what }; cells.forEach((c, i) => { o['fg'+i]=c.fg; o['bg'+i]=c.bg; o['icon'+i]=c.icon; o['text'+i]=c.text; }); return o; }) }; } }
+</script>
+</body>
+</html>
