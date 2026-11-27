@@ -48,6 +48,17 @@ VEHICLE_TYPES = {
                          service_km=50000, speed=78, energy="electric"),
 }
 
+# Truck routing dimensions per type (typical EU values): height / width / length in m,
+# max gross weight and empty weight in kg, axle count. Diesel truck = 5-axle tractor + semi-trailer,
+# electric truck = 3-axle rigid, vans = 3.5 t panel vans.
+VEHICLE_DIMENSIONS = {
+    "truck_diesel": dict(height_m=4.0, width_m=2.55, length_m=16.5, weight_kg=40000, empty_kg=15000, axles=5),
+    "van_diesel":   dict(height_m=2.7, width_m=2.05, length_m=6.0, weight_kg=3500, empty_kg=2000, axles=2),
+    "truck_ev":     dict(height_m=3.9, width_m=2.55, length_m=12.0, weight_kg=27000, empty_kg=11000, axles=3),
+    "van_ev":       dict(height_m=2.6, width_m=2.0, length_m=5.5, weight_kg=3500, empty_kg=2500, axles=2),
+}
+HAZMAT_CARGO = {"fertiliser bags"}      # ammonium-nitrate fertiliser can be ADR class 5.1: hazmat routing
+
 FLEET_MIX = [("truck_diesel", 14), ("van_diesel", 8), ("truck_ev", 3), ("van_ev", 5)]
 
 # Prices. Diesel = Latvian national average, EU Weekly Oil Bulletin, 9 Nov 2026.

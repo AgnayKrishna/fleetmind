@@ -49,6 +49,30 @@ const basemap = L.maplibreGL({ style: MAP_STYLE,
     gl.setStyle(MAP_STYLE_FALLBACK);
   });
 }
+// With a TomTom key on the server, swap to TomTom raster tiles plus the live traffic flow layer.
+// Tiles come through the backend (/api/map/tile/...), so the key never reaches the browser.
+let mapProvider = null, routingAttribution = null;
+function applyMapProvider(info) {
+  if (!info) return;
+  const want = info.tomtom_tiles ? "tomtom" : "openfreemap";
+  if (want !== mapProvider) {
+    mapProvider = want;
+    if (want === "tomtom") {
+      if (map.hasLayer(basemap)) map.removeLayer(basemap);
+      L.tileLayer(`${API}/api/map/tile/basic/{z}/{x}/{y}.png`, { maxZoom: 18,
+        attribution: '&copy; <a href="https://www.tomtom.com">TomTom</a>' }).addTo(map);
+      L.tileLayer(`${API}/api/map/tile/traffic/{z}/{x}/{y}.png`, { maxZoom: 18, opacity: 0.85 }).addTo(map);
+    }
+  }
+  if (info.attribution !== routingAttribution) {
+    if (routingAttribution) map.attributionControl.removeAttribution(esc(routingAttribution));
+    routingAttribution = info.attribution;
+    map.attributionControl.addAttribution(esc(routingAttribution));
+  }
+}
+const ROUTE_SOURCE = { tomtom: "TomTom truck routing + live traffic", here: "HERE truck routing (backup)",
+  osrm: "OSRM / OpenStreetMap", fallback: "straight-line estimate (routing offline)" };
+
 const markers = {}, routes = {}, jobMarkers = {}, zoneLayers = {};
 let selected = null, lastState = null, lastLog = 0, approvalsKey = "";
 
@@ -83,7 +107,10 @@ function popup(v) {
     <br>Energy: ${v.energy_pct}% (${v.range_km} km range)
     <br>Health: ${v.health}% · service in ${v.service_due_km.toLocaleString()} km
     <br>Driving today: ${v.drive_today_h} h · since break ${v.since_break_h} h
-    ${v.speed_factor !== null && v.speed_factor < 1 ? `<br>Slowed to ${Math.round(v.speed_factor * 100)}% speed` : ""}`;
+    ${v.speed_factor !== null && v.speed_factor < 1 ? `<br>Slowed to ${Math.round(v.speed_factor * 100)}% speed` : ""}
+    ${v.route_source ? `<br><span class="pop-src">Route: ${esc(ROUTE_SOURCE[v.route_source] || v.route_source)}` +
+      `${v.traffic_delay_min > 0 ? ` · traffic +${Math.round(v.traffic_delay_min)} min` : ""}</span>` : ""}
+    ${v.dims ? `<br><span class="pop-src">${v.dims.height_m} m high · ${v.dims.length_m} m long · ${(v.dims.weight_kg / 1000).toFixed(1)} t max · ${v.dims.axles} axles</span>` : ""}`;
 }
 
 function drawMap(s) {
@@ -497,7 +524,7 @@ async function poll() {
     failures = 0; $("#offline").classList.add("hidden");
     lastState = s;
     if (s.gtm_kpi && !REF) setGtmCount(s.gtm_kpi.leads);
-    drawHeader(s); drawMap(s); drawKpis(s); drawApprovals(s); drawAttention(s); drawLog(s); drawFleet(s); drawChart(s);
+    applyMapProvider(s.map); drawHeader(s); drawMap(s); drawKpis(s); drawApprovals(s); drawAttention(s); drawLog(s); drawFleet(s); drawChart(s);
   } catch (e) {
     if (++failures > 2) { $("#apiUrl").textContent = API || location.origin; $("#offline").classList.remove("hidden"); }
   }

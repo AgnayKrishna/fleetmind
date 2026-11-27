@@ -6,13 +6,14 @@ import sys
 from pathlib import Path
 
 os.environ["AGENT_MODE"] = "rules"
+os.environ["FLEETMIND_NO_DOTENV"] = "1"
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fastapi.testclient import TestClient  # noqa: E402
 
 from backend import services  # noqa: E402
 
-services.get_routes = lambda a, b, alternatives=False: [services._straight_route(a, b)] * (2 if alternatives else 1)
+services.get_routes = lambda a, b, alternatives=False, **kw: [services._straight_route(a, b)] * (2 if alternatives else 1)
 
 from backend.app import app, world as app_world  # noqa: E402
 from backend.data import PRICES  # noqa: E402

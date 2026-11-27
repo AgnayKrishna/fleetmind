@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 os.environ["AGENT_MODE"] = "rules"
+os.environ["FLEETMIND_NO_DOTENV"] = "1"
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fastapi.testclient import TestClient  # noqa: E402

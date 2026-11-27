@@ -20,7 +20,7 @@ from .sim import MOVING, clock_str
 
 AGENTS = {
     "Orchestrator": "Coordinates all agents, applies the risk policy, talks to the fleet manager.",
-    "Route Agent": "Routes, traffic incidents, weather impact, ETAs (OpenStreetMap / OSRM, Open-Meteo).",
+    "Route Agent": "Truck routes, live traffic, weather impact, ETAs (TomTom, HERE backup, OSRM; Open-Meteo).",
     "Dispatch Agent": "Matches jobs to vehicles: capacity, driver hours (EU 561/2006), time windows, EV range.",
     "Maintenance Agent": "Vehicle health, service intervals, breakdown diagnosis and repair planning.",
     "Fuel & Cost Agent": "Fuel and charging, cost per km, CO2, consumption anomalies.",

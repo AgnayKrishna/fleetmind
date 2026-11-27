@@ -6,8 +6,8 @@ from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 
 from . import services
-from .data import (CARGO, CHARGERS, CO2, DEPOTS, DRIVER_NAMES, FLEET_MIX, FUEL_STATIONS, LOCATIONS, PRICES,
-                   VEHICLE_TYPES, loc, random_pickup)
+from .data import (CARGO, CHARGERS, CO2, DEPOTS, DRIVER_NAMES, FLEET_MIX, FUEL_STATIONS, HAZMAT_CARGO, LOCATIONS,
+                   PRICES, VEHICLE_DIMENSIONS, VEHICLE_TYPES, loc, random_pickup)
 
 MOVING = ("to_pickup", "to_dropoff", "to_depot", "to_fuel")
 TIMED = ("loading", "unloading", "break", "refuel", "service", "broken")
@@ -85,7 +85,8 @@ class World:
                     "service_km": spec["service_km"], "health": self.rng.randint(55, 100),
                     "drive_since_break": self.rng.randint(0, 60), "drive_today": 0.0, "last_drive": self.sim,
                     "use_mult": 1.0, "avoid_zones": set(), "fault": None, "trip_km": 0.0,
-                }
+                    "hazmat": False, "route_source": None, "traffic_delay_min": 0.0,
+                } | VEHICLE_DIMENSIONS[vtype]
 
     # ---------------- logging ----------------
     def add_log(self, agent, text, kind="info", model=None, extra=None):
@@ -114,6 +115,7 @@ class World:
                 "created": self.sim, "window_end": self.sim + est + slack, "est_km": km,
                 "delivered_at": None, "late": False, "customer_notified": False,
             }
+            self.jobs[jid]["hazmat"] = self.jobs[jid]["cargo"] in HAZMAT_CARGO
             return self.jobs[jid]
 
     # ---------------- geometry ----------------
@@ -133,6 +135,7 @@ class World:
         if route["minutes"] > 0:
             v["base_speed"] = max(30, min(spec_speed, route["km"] / (route["minutes"] / 60) * 0.92))
         v["route_source"] = route["source"]
+        v["traffic_delay_min"] = route.get("traffic_delay_min", 0.0)
 
     def _point_at(self, v, km):
         cum, rt = v["cum"], v["route"]
@@ -151,15 +154,23 @@ class World:
         f = (km - cum[lo]) / seg
         return rt[lo][0] + (rt[hi][0] - rt[lo][0]) * f, rt[lo][1] + (rt[hi][1] - rt[lo][1]) * f
 
+    def route_profile(self, v, next_status=None):
+        """Truck routing profile: the vehicle's dimensions, its weight with the load on board, hazmat."""
+        job = self.jobs.get(v["job_id"]) if v["job_id"] else None
+        loaded = bool(job) and (next_status == "to_dropoff" or job["status"] in ("loading", "in_transit"))
+        return services.vehicle_profile(v, cargo_kg=job["weight"] if loaded else 0,
+                                        hazmat=bool(loaded and job.get("hazmat")))
+
     def request_route(self, v, lat, lon, next_status, alternatives=False, pick=0):
-        """Ask OSRM for a route in the background; vehicle waits in 'routing'."""
+        """Ask the routing provider for a truck route in the background; vehicle waits in 'routing'."""
         v["route_token"] += 1
         token = v["route_token"]
         v["status"], v["after_route"] = "routing", next_status
         a, b = (v["lat"], v["lon"]), (lat, lon)
+        profile = self.route_profile(v, next_status)
 
         def work():
-            routes = services.get_routes(a, b, alternatives=alternatives)
+            routes = services.get_routes(a, b, alternatives=alternatives, vehicle=profile)
             route = routes[min(pick, len(routes) - 1)]
             with self.lock:
                 if v["route_token"] == token and v["status"] == "routing":
@@ -605,6 +616,9 @@ class World:
                     "odometer": round(v["odometer"]), "route": remaining, "trip": self._trip_info(v),
                     "energy_stop": self._suggested_stop(v),
                     "fuel_stop": v["fuel_stop"]["station"]["name"] if v.get("fuel_stop") else None,
+                    "route_source": v["route_source"] if remaining else None,
+                    "traffic_delay_min": v["traffic_delay_min"] if remaining else 0,
+                    "dims": {k2: v[k2] for k2 in ("height_m", "width_m", "length_m", "weight_kg", "axles")},
                     "speed_factor": round(self.speed_factor(v), 2) if v["status"] in MOVING else None})
             k = dict(self.kpi)
             k["on_time_pct"] = round(100 * (k["delivered"] - k["late"]) / k["delivered"]) if k["delivered"] else 100
@@ -626,6 +640,7 @@ class World:
                 "approvals": [a for a in self.approvals.values() if a["state"] == "pending"],
                 "log": [e for e in self.log if e["id"] > log_after][-120:],
                 "history": self.history, "prices": PRICES, "routing": dict(services.stats),
+                "map": services.routing_info(),
             }
 
     # ---------------- background loop ----------------

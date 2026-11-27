@@ -4,18 +4,31 @@ import threading
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import llm
+from . import llm, services
 from .agents import AGENTS, AgentTeam
 from .db import Store
 from .gtm import GtmAgent
 from .sim import World
 
+def _load_dotenv(path=Path(__file__).resolve().parent.parent / ".env"):
+    """KEY=value lines from .env (TOMTOM_API_KEY, HERE_API_KEY, ...). Never overrides real env vars,
+    values are never logged. Tests set FLEETMIND_NO_DOTENV=1 so they can't pick up real keys."""
+    if os.getenv("FLEETMIND_NO_DOTENV") or not path.is_file():
+        return
+    for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            k, v = line.removeprefix("export ").split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+_load_dotenv()
 llm.init()
 store = Store()
 job_seq, appr_seq = store.next_seq()
@@ -103,6 +116,15 @@ def gtm_open(o: GtmOpenIn):
 @app.post("/api/gtm/{lead_id}/status")
 def gtm_status(lead_id: str, s: GtmStatusIn):
     return gtm.set_status(lead_id, s.status)
+
+
+@app.get("/api/map/tile/{layer}/{z}/{x}/{y}.png")
+def map_tile(layer: str, z: int, x: int, y: int):
+    """TomTom map / live traffic tiles through the server, so the API key never reaches the browser."""
+    png = services.tomtom_tile(layer, z, x, y)
+    if png is None:
+        return Response(status_code=404)
+    return Response(png, media_type="image/png", headers={"Cache-Control": "public, max-age=300"})
 
 
 @app.get("/api/history/{what}")

@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from backend import services  # noqa: E402
 
-services.get_routes = lambda a, b, alternatives=False: [services._straight_route(a, b)] * (2 if alternatives else 1)
+services.get_routes = lambda a, b, alternatives=False, **kw: [services._straight_route(a, b)] * (2 if alternatives else 1)
 
 from backend.sim import DAILY_DRIVE_MAX, DAILY_REST_MIN, World  # noqa: E402
 

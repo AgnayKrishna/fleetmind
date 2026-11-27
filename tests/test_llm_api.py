@@ -71,7 +71,7 @@ def test_failed_call_returns_none_so_rules_take_over(api_mode):
 
 def test_decision_pipeline_falls_back_to_rules_when_api_fails(api_mode):
     from backend import services
-    services.get_routes = lambda a, b, alternatives=False: [services._straight_route(a, b)] * (2 if alternatives else 1)
+    services.get_routes = lambda a, b, alternatives=False, **kw: [services._straight_route(a, b)] * (2 if alternatives else 1)
     from backend.agents import AgentTeam
     from backend.sim import World
     api_mode.messages.fail = True

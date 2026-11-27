@@ -129,6 +129,7 @@ tr { cursor: pointer; } tr:hover td { background: var(--panel2); }
   .chart { height: 260px; } .fleet { height: 320px; }
 }
 .pop-sep { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
+.pop-src { color: var(--muted, #94a3b8); font-size: 11px; }
 .kpi span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
 
 /* ---------- right column: tabs ---------- */
