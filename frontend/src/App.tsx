@@ -5,7 +5,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { api, logout, me, onLoginRequired } from '@/lib/api'
 import { can, type AttentionItem } from '@/lib/fleet'
-import type { Approval, User } from '@/lib/types'
+import type { AiAction, Approval, User } from '@/lib/types'
 import { useFleet } from '@/hooks/useFleet'
 import { useTheme } from '@/hooks/useTheme'
 import { useLite } from '@/hooks/useLite'
@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils'
 import { GtmPage } from '@/pages/Gtm'
 import { ReportsPage } from '@/pages/Reports'
 import { FleetPage } from '@/pages/Fleet'
+import { ActivityPage } from '@/pages/Activity'
 
 const PAGES: Page[] = ['map', 'fleet', 'orders', 'activity', 'reports', 'gtm']
 const pageFromHash = (): Page => {
@@ -120,6 +121,12 @@ export default function App() {
     else if (r && !r.ok) toast.error(r.error ?? 'Not applied')
   }
 
+  async function undoAction(a: AiAction) {
+    const r = await write<{ ok: boolean; instead?: string; error?: string }>(`/api/actions/${encodeURIComponent(a.id)}/undo`, {})
+    if (r?.ok) toast.success(`Undone. ${r.instead ?? ''}`)
+    return !!r?.ok
+  }
+
   if (booting) return null
   if (!user) return <><VehicleSymbols /><Login onSignedIn={setUser} /></>
   if (user.role === 'driver') return null
@@ -173,7 +180,8 @@ export default function App() {
             {page === 'gtm' && can.gtm(role) && <GtmPage />}
             {page === 'reports' && can.history(role) && <ReportsPage state={s} />}
             {page === 'fleet' && <FleetPage state={s} log={feed.log} onSelect={selectVehicle} lastOk={feed.lastOk} />}
-            {['orders', 'activity'].includes(page) && (
+            {page === 'activity' && <ActivityPage state={s} log={feed.log} onSelectVehicle={selectVehicle} onUndo={undoAction} />}
+            {page === 'orders' && (
               <Panel className="p-6">
                 <h1 className="text-[20px] font-extrabold">Coming next</h1>
                 <p className="mt-1 text-muted-ink">This screen is being rebuilt. The <a className="font-bold text-amber-text underline" href="classic.html">classic dashboard</a> still has it.</p>

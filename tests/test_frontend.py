@@ -53,6 +53,12 @@ def test_fleet_table_in_bundle():
         assert needle in js, needle
 
 
+def test_ai_activity_in_bundle():
+    _, js = bundle()
+    for needle in ("What your AI team did today", "/api/actions/", "/undo", "Decision details", "can’t be undone"):
+        assert needle in js, needle
+
+
 def test_lite_mode_in_bundle():
     _, js = bundle()
     for needle in ("Lite mode", "fmLite", "(max-width: 1440px), (max-height: 800px)", "prefers-reduced-transparency",

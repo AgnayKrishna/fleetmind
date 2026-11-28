@@ -196,3 +196,31 @@ def test_employee_energy_stop_only_on_own_trucks():
     other = next(v for v in sorted(app_world.vehicles) if v not in mine)
     r = client_for("employee").post(f"/api/vehicles/{other}/energy_stop", json={})
     assert r.status_code == 403
+
+
+def test_undo_really_reverts_an_automatic_assignment():
+    """What the AI activity screen's Undo calls: the order goes back to the queue and the truck stops."""
+    r = client_for("admin").post("/api/orders", json={"pickup": "FREEPORT", "dropoff": "KEKAVA", "weight": 800})
+    assert r.status_code == 200, r.text
+    jid = r.json()["job"]["id"]
+    with app_world.lock:
+        held = [j for j in app_world.jobs.values() if j["id"] != jid and j["status"] == "pending" and not j.get("hold")]
+        for j in held:                               # only our order gets dispatched
+            j["hold"] = True
+        app_world._routine_dispatch()
+        for j in held:
+            j["hold"] = False
+    job = app_world.jobs[jid]
+    assert job["status"] == "assigned", "the rules engine should find a vehicle for an 800 kg order"
+    vid = job["vehicle"]
+    app_world.vehicles[vid]["fuel_stop"] = None
+    act = next(a for a in app_world.actions_view() if a["job"] == jid)
+    assert act["reversible"]
+    r = client_for("admin").post(f"/api/actions/{act['id']}/undo")
+    assert r.status_code == 200 and r.json()["ok"], r.text
+    assert job["status"] == "pending" and job["vehicle"] is None and vid in job["exclude"]
+    assert app_world.vehicles[vid]["job_id"] is None and app_world.vehicles[vid]["status"] == "idle"
+    assert any(f"undid {act['id']}" in e["text"] for e in app_world.log)
+    view = next(a for a in client_for("admin").get("/api/actions").json()["actions"] if a["id"] == act["id"])
+    assert view["state"] == "undone" and not view["can_undo"] and view["instead"]
+    assert client_for("admin").post(f"/api/actions/{act['id']}/undo").status_code == 409    # only once
