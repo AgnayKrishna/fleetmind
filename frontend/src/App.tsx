@@ -8,6 +8,7 @@ import { can, type AttentionItem } from '@/lib/fleet'
 import type { Approval, User } from '@/lib/types'
 import { useFleet } from '@/hooks/useFleet'
 import { useTheme } from '@/hooks/useTheme'
+import { useLite } from '@/hooks/useLite'
 import { Login } from '@/components/Login'
 import { TopBar, type Page } from '@/components/TopBar'
 import { FleetMap, type MapFocus } from '@/components/map/FleetMap'
@@ -18,6 +19,7 @@ import { ApprovalDialog, MessageDialog } from '@/components/Dialogs'
 import { Chat } from '@/components/Chat'
 import { VehicleSymbols } from '@/components/VehicleSymbols'
 import { Panel } from '@/components/fm'
+import { cn } from '@/lib/utils'
 import { GtmPage } from '@/pages/Gtm'
 import { ReportsPage } from '@/pages/Reports'
 
@@ -41,7 +43,8 @@ export default function App() {
   const [approvalId, setApprovalId] = useState<string | null>(null)
   const [msgFor, setMsgFor] = useState<string | null>(null)
   const [chat, setChat] = useState<{ open: boolean; q: { text: string; key: number } | null }>({ open: false, q: null })
-  const lite = false
+  const liteMode = useLite()
+  const lite = liteMode.lite
   const top = useRef<HTMLDivElement>(null)
   const [topH, setTopH] = useState(76)
 
@@ -120,20 +123,24 @@ export default function App() {
   if (!user) return <><VehicleSymbols /><Login onSignedIn={setUser} /></>
   if (user.role === 'driver') return null
 
-  const sheetPad = vehicle ? 260 : 40
-  const panelTop = topH + 20 + 16
-  const panelStyle = { top: panelTop, maxHeight: `calc(100% - ${panelTop + 20}px)` }
+  const sheetPad = vehicle ? (lite ? 120 : 260) : 40
+  const gap = lite ? 12 : 20
+  const panelTop = lite ? topH + 12 : topH + 20 + 16
+  const panelStyle = { top: panelTop, maxHeight: `calc(100% - ${panelTop + gap}px)` }
 
   return (
     <TooltipProvider>
       <VehicleSymbols />
       <div className="relative h-full overflow-hidden bg-background text-ink max-[900px]:overflow-y-auto">
         <div className="absolute inset-0 max-[900px]:relative max-[900px]:h-[440px]" style={{ marginTop: 0 }}>
-          <FleetMap state={s} theme={theme} lite={lite} selected={selected} onSelect={selectVehicle} focus={focus} bottomPad={sheetPad} />
+          <FleetMap state={s} theme={theme} lite={lite} selected={selected} onSelect={selectVehicle} focus={focus} bottomPad={sheetPad}
+            onSlow={liteMode.reportSlow} offline={feed.offline} />
         </div>
 
-        <div ref={top} className="pointer-events-none absolute top-5 right-5 left-5 z-20 max-[900px]:fixed max-[900px]:top-2 max-[900px]:right-2 max-[900px]:left-2">
+        <div ref={top} className={cn('pointer-events-none absolute z-20',
+          lite ? 'top-0 right-0 left-0' : 'top-5 right-5 left-5 max-[900px]:fixed max-[900px]:top-2 max-[900px]:right-2 max-[900px]:left-2')}>
           <TopBar state={s} user={user} page={page} onPage={setPage} onSelectVehicle={selectVehicle}
+            lite={lite} liteAuto={liteMode.auto} liteReason={liteMode.reason} onLite={liteMode.toggle} onLiteReset={liteMode.reset}
             onAsk={q => setChat({ open: true, q: { text: q, key: Date.now() } })}
             onEvent={type => write('/api/event', { type, vehicle_id: selected }, 'Event started. Watch the AI team.')}
             onControl={(action, value) => write('/api/control', { action, value })}
@@ -143,17 +150,18 @@ export default function App() {
         {s && page === 'map' && (
           <>
             <NeedsYou state={s} canWrite={canWrite} compact={lite} onAction={onAttention}
-              className="absolute left-5 z-10 w-[360px] max-[900px]:static max-[900px]:m-3 max-[900px]:w-auto"
+              className={cn('absolute z-10 max-[900px]:static max-[900px]:m-3 max-[900px]:w-auto', lite ? 'left-3 w-[300px]' : 'left-5 w-[360px]')}
               style={panelStyle} />
             <AiTeam state={s} log={feed.log} showGtm={can.gtm(role)} rail={lite} style={panelStyle}
-              className={lite ? 'absolute right-5 z-10 max-[900px]:hidden' : 'absolute right-5 z-10 w-[320px] max-[900px]:static max-[900px]:m-3 max-[900px]:w-auto'} />
+              className={lite ? 'absolute right-3 z-10 max-[900px]:hidden' : 'absolute right-5 z-10 w-[320px] max-[900px]:static max-[900px]:m-3 max-[900px]:w-auto'} />
             <AnimatePresence>
               {vehicle && (
                 <VehicleSheet key={vehicle.id} v={vehicle} approval={approvalFor(vehicle.id)} canWrite={canWrite} compact={lite}
                   onClose={() => setSelected(null)} onMessage={() => setMsgFor(vehicle.id)}
                   onEnergy={async () => { await write(`/api/vehicles/${encodeURIComponent(vehicle.id)}/energy_stop`, {}, `Stop added for ${vehicle.id}`) }}
                   onReview={a => setApprovalId(a.id)}
-                  className={'absolute bottom-5 z-20 max-[900px]:static max-[900px]:m-3 ' + (lite ? 'right-[96px] left-[400px]' : 'right-[360px] left-[400px]')} />
+                  className={cn('absolute z-20 max-[900px]:static max-[900px]:m-3 max-[900px]:w-auto max-[900px]:translate-x-0',
+                    lite ? 'bottom-3 left-1/2 w-[min(560px,calc(100%-400px))] -translate-x-1/2' : 'right-[360px] bottom-5 left-[400px]')} />
               )}
             </AnimatePresence>
           </>

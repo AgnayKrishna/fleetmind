@@ -25,11 +25,19 @@ export function NeedsYou({ state, canWrite, compact, onAction, className, style 
   const today = k.auto_decisions + k.approvals_done + state.approvals.length
 
   return (
-    <Panel aria-label="Needs you" style={style} className={cn('flex min-h-0 flex-col gap-1.5 p-[18px]', className)}>
-      <div className="flex items-baseline justify-between px-1 pb-2">
-        <h2 className="text-[20px] font-extrabold tracking-[-0.3px]">Needs you</h2>
-        <span className="text-[13px] text-muted-ink">{items.length ? `${items.length} of ${today} decisions today` : `${today} decisions today`}</span>
-      </div>
+    <Panel aria-label="Needs you" style={style}
+      className={cn('flex min-h-0 flex-col gap-1.5', compact ? 'rounded-[14px] p-3.5' : 'p-[18px]', className)}>
+      {compact ? (
+        <div className="flex items-center justify-between px-1 pb-1">
+          <h2 className="text-[16px] font-extrabold">Needs you</h2>
+          {items.length > 0 && <span className="rounded-full bg-act-tint px-2.5 py-0.5 text-[12px] font-extrabold text-act-text">{items.length}</span>}
+        </div>
+      ) : (
+        <div className="flex items-baseline justify-between px-1 pb-2">
+          <h2 className="text-[20px] font-extrabold tracking-[-0.3px]">Needs you</h2>
+          <span className="text-[13px] text-muted-ink">{items.length ? `${items.length} of ${today} decisions today` : `${today} decisions today`}</span>
+        </div>
+      )}
       {items.length === 0 && (
         <div className="rounded-[16px] bg-[var(--fm-card)] p-4">
           <p className="text-[15px] font-bold">All clear</p>
@@ -41,12 +49,15 @@ export function NeedsYou({ state, canWrite, compact, onAction, className, style 
           {shown.map((it, i) => (
             <motion.div key={it.key} layout={!reduce} initial={reduce ? false : { opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
               exit={reduce ? { opacity: 0 } : { opacity: 0, height: 0 }} transition={{ duration: 0.22 }}
-              className={cn('flex gap-3 rounded-[16px] p-3', i === 0 && 'bg-[var(--fm-card)]')}>
+              className={cn('flex gap-3',
+                compact ? cn('rounded-[10px] p-2.5', it.tone === 'act' ? 'bg-act-tint' : 'bg-chip') : 'rounded-[16px] p-3',
+                !compact && i === 0 && 'bg-[var(--fm-card)]')}>
               <span className="mt-1.5 size-2.5 shrink-0 rounded-full"
                 style={{ background: DOT[it.tone], boxShadow: i === 0 && it.tone === 'act' ? '0 0 0 5px var(--fm-act-tint)' : undefined }} />
               <div className="min-w-0 flex-1">
-                <div className="text-[15px] font-bold leading-snug">{it.title}</div>
-                <div className="mt-0.5 line-clamp-2 text-[13px] leading-[1.45] text-muted-ink">{it.detail}</div>
+                <div className={cn('font-bold leading-snug', compact ? 'text-[14px]' : 'text-[15px]',
+                  compact && it.tone === 'act' && 'font-extrabold text-act-text')}>{it.title}</div>
+                <div className={cn('mt-0.5 line-clamp-2 leading-[1.45] text-muted-ink', compact ? 'text-[12px]' : 'text-[13px]')}>{it.detail}</div>
                 {it.sample && <div className="mt-1"><SampleTag /></div>}
               </div>
               {it.action && (
@@ -61,7 +72,7 @@ export function NeedsYou({ state, canWrite, compact, onAction, className, style 
         </AnimatePresence>
       </div>
       {compact && items.length > 2 && (
-        <button onClick={() => setExpanded(e => !e)} className="mt-1 min-h-9 rounded-[10px] text-[13px] font-bold text-amber-text hover:bg-chip">
+        <button onClick={() => setExpanded(e => !e)} className="mt-1 min-h-9 rounded-[10px] bg-chip text-[13px] font-bold text-ink hover:brightness-95">
           {expanded ? 'Show less' : `Show ${items.length - 2} more`}
         </button>
       )}

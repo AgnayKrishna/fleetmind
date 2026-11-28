@@ -45,3 +45,10 @@ def test_control_centre_features_in_bundle():
     for needle in ("Needs you", "Your AI team", "View as guest", "/api/state", "/api/approvals/", "/energy_stop",
                    "/api/chat", "/api/event", "Switch to dark mode", "Sample data", "Ctrl K"):
         assert needle in js, needle
+
+
+def test_lite_mode_in_bundle():
+    _, js = bundle()
+    for needle in ("Lite mode", "fmLite", "(max-width: 1440px), (max-height: 800px)", "prefers-reduced-transparency",
+                   "hardwareConcurrency", "deviceMemory", "below 30 frames"):
+        assert needle in js, needle

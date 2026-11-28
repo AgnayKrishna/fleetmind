@@ -108,7 +108,7 @@ function markerHtml(v: Vehicle, selected: boolean, lite: boolean) {
 
 export interface MapFocus { lon: number; lat: number; zoom?: number; key: number }
 
-export function FleetMap({ state, theme, lite, selected, onSelect, focus, bottomPad }: {
+export function FleetMap({ state, theme, lite, selected, onSelect, focus, bottomPad, onSlow, offline }: {
   state: FleetState | null
   theme: Theme
   lite: boolean
@@ -116,14 +116,16 @@ export function FleetMap({ state, theme, lite, selected, onSelect, focus, bottom
   onSelect: (id: string | null) => void
   focus: MapFocus | null
   bottomPad: number
+  onSlow?: () => void          // the map ran below 30 fps for 3 s (lite mode turns on)
+  offline?: boolean            // positions are stale: grey the map
 }) {
   const box = useRef<HTMLDivElement>(null)
   const map = useRef<maplibregl.Map | null>(null)
   const markers = useRef(new Map<string, MarkerRec>())
   const ready = useRef(false)
   const reveal = useRef<{ id: string | null; t0: number }>({ id: null, t0: 0 })
-  const latest = useRef({ state, selected, lite, onSelect })
-  latest.current = { state, selected, lite, onSelect }
+  const latest = useRef({ state, selected, lite, onSelect, onSlow })
+  latest.current = { state, selected, lite, onSelect, onSlow }
 
   // ---- create the map once ----
   useEffect(() => {
@@ -141,7 +143,22 @@ export function FleetMap({ state, theme, lite, selected, onSelect, focus, bottom
     })
     map.current = m
     let raf = 0
-    const tick = () => { animate(); raf = requestAnimationFrame(tick) }
+    // frame-rate watch for lite mode: below 30 fps for 3 s in a row (only while the tab is visible)
+    let secStart = performance.now(), frames = 0, slowSecs = 0
+    const tick = () => {
+      animate()
+      const now = performance.now()
+      frames++
+      if (now - secStart >= 1000) {
+        const fps = (frames * 1000) / (now - secStart)
+        const watching = document.visibilityState === 'visible' && !latest.current.lite
+        slowSecs = watching && fps < 30 ? slowSecs + 1 : 0
+        if (slowSecs >= 3) { slowSecs = 0; latest.current.onSlow?.() }
+        secStart = now
+        frames = 0
+      }
+      raf = requestAnimationFrame(tick)
+    }
     raf = requestAnimationFrame(tick)
     return () => { cancelAnimationFrame(raf); markers.current.forEach(r => r.m.remove()); markers.current.clear(); m.remove() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -289,5 +306,6 @@ export function FleetMap({ state, theme, lite, selected, onSelect, focus, bottom
     src.setData({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } })
   }
 
-  return <div ref={box} className="absolute inset-0" aria-label="Live map of the fleet" role="region" />
+  return <div ref={box} className={'absolute inset-0 transition-[filter] duration-500' + (offline ? ' grayscale-[0.85] opacity-80' : '')}
+    aria-label="Live map of the fleet" role="region" />
 }

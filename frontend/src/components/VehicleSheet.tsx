@@ -18,7 +18,7 @@ export function VehicleSheet({ v, approval, canWrite, compact, onClose, onMessag
   onReview: (a: Approval) => void
   className?: string
 }) {
-  const reduce = useReducedMotion()
+  const reduce = useReducedMotion() || compact     // lite mode: no sliding
   const t = v.trip
   const first = v.driver.split(' ')[0]
   const energyBtn = canWrite && v.mine && v.energy_stop
@@ -31,22 +31,23 @@ export function VehicleSheet({ v, approval, canWrite, compact, onClose, onMessag
   return (
     <motion.div initial={reduce ? false : { y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={reduce ? { opacity: 0 } : { y: 40, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 380, damping: 34 }} className={className}>
-      <Panel aria-label={`Selected vehicle ${v.id}`} className={cn('flex flex-col gap-3.5 rounded-[26px] px-[22px] pt-3 pb-5', compact && 'gap-2.5 pb-4')}>
-        <div className="mx-auto h-[5px] w-10 rounded-full bg-[var(--fm-line)]" aria-hidden="true" />
+      <Panel aria-label={`Selected vehicle ${v.id}`}
+        className={cn('flex flex-col', compact ? 'gap-2.5 rounded-[16px] px-4 py-3.5' : 'gap-3.5 rounded-[26px] px-[22px] pt-3 pb-5')}>
+        {!compact && <div className="mx-auto h-[5px] w-10 rounded-full bg-[var(--fm-line)]" aria-hidden="true" />}
         <div className="flex flex-wrap items-center gap-[18px]">
           {!compact && <VehicleGlyph v={v} size="lg" />}
           <div className="min-w-[220px] flex-1">
             <div className="flex flex-wrap items-center gap-2.5">
-              <span className="text-[22px] font-extrabold tracking-[-0.4px]">{v.id}</span>
+              <span className={cn('font-extrabold', compact ? 'text-[16px]' : 'text-[22px] tracking-[-0.4px]')}>{v.id}{compact && ` · ${v.driver}`}</span>
               <StatusChip status={statusOf(v)} />
               {t?.cargo && (t.on_time ? <Badge tone="good">Arrives on time</Badge> : <Badge tone="watch">Late by {t.late_min} min</Badge>)}
               {t?.priority === 'urgent' && <Badge tone="act">Urgent</Badge>}
             </div>
-            <div className="mt-1 text-[14px] text-muted-ink">
-              {v.driver} · {v.label} · {DOING[v.status] ?? v.status}
+            <div className={cn('mt-1 text-muted-ink', compact ? 'text-[13px]' : 'text-[14px]')}>
+              {!compact && `${v.driver} · `}{v.label} · {DOING[v.status] ?? v.status}
               {t ? ` · ${t.remaining_km} km to ${t.destination}` : ''} · {Math.max(0, 9 - v.drive_today_h).toFixed(1)} h driving left today
             </div>
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted-ink">
+            <div className={cn('mt-1 flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted-ink', compact ? 'hidden' : 'flex')}>
               <span>{v.unit === 'kWh' ? 'Battery' : 'Fuel'} <b className={cn('text-ink', v.energy_pct < 20 && 'text-act-text')}>{v.energy_pct}%</b> · {v.range_km} km</span>
               <span>Health <b className="text-ink">{v.health}%</b></span>
               {t?.cargo && <span>{t.cargo} · {t.weight?.toLocaleString()} kg</span>}
@@ -56,7 +57,7 @@ export function VehicleSheet({ v, approval, canWrite, compact, onClose, onMessag
           </div>
           {t && (
             <div className="text-right">
-              <div className="num text-[26px]">{t.eta}</div>
+              <div className={cn('num', compact ? 'text-[18px]' : 'text-[26px]')}>{t.eta}</div>
               <div className="text-[13px] text-muted-ink">{t.deadline ? `deadline ${t.deadline}` : 'arrival'}</div>
             </div>
           )}

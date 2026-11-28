@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { FlaskConical, LogOut, Moon, Search, Sparkles, Sun, Pause, Play, Gauge } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { can, eur, ROLE_LABEL } from '@/lib/fleet'
+import { Switch } from '@/components/ui/switch'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { can, eur, ROLE_LABEL, STATUS, statusOf, type StatusKey } from '@/lib/fleet'
 import type { FleetState, User } from '@/lib/types'
 import { Logo, Panel } from './fm'
 import { VehicleGlyph } from './VehicleSymbols'
@@ -22,7 +24,25 @@ const EVENTS = [
   { type: 'urgent_order', label: 'Urgent order', hint: 'Dina re-plans' },
 ]
 
-export function TopBar({ state, user, page, onPage, onSelectVehicle, onAsk, onEvent, onControl, theme, onTheme, onLogout, extra }: {
+function StatusPills({ state }: { state: FleetState }) {
+  const n = { route: 0, risk: 0, act: 0 }
+  for (const v of state.vehicles) {
+    const s = statusOf(v)
+    if (s === 'route' || s === 'risk' || s === 'act') n[s]++
+  }
+  const pills: [StatusKey, string][] = [['route', `${n.route} on route`], ['risk', `${n.risk} delay risk`], ['act', `${n.act} act now`]]
+  return (
+    <div className="hidden gap-1.5 lg:flex" aria-label="Fleet status">
+      {pills.map(([k, label]) => (
+        <span key={k} className="rounded-full px-2.5 py-1.5 text-[13px] font-bold whitespace-nowrap"
+          style={{ background: STATUS[k].tint, color: STATUS[k].text }}>{label}</span>
+      ))}
+    </div>
+  )
+}
+
+export function TopBar({ state, user, page, onPage, onSelectVehicle, onAsk, onEvent, onControl, theme, onTheme, onLogout, extra,
+  lite, liteAuto, liteReason, onLite, onLiteReset }: {
   state: FleetState | null
   user: User
   page: Page
@@ -35,6 +55,11 @@ export function TopBar({ state, user, page, onPage, onSelectVehicle, onAsk, onEv
   onTheme: () => void
   onLogout: () => void
   extra?: ReactNode
+  lite: boolean
+  liteAuto: boolean
+  liteReason: string | null
+  onLite: () => void
+  onLiteReset: () => void
 }) {
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
@@ -79,7 +104,8 @@ export function TopBar({ state, user, page, onPage, onSelectVehicle, onAsk, onEv
   const initials = user.name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
   return (
-    <Panel className="pointer-events-auto flex flex-wrap items-center gap-2 py-2.5 pr-3 pl-4 lg:gap-3">
+    <Panel className={cn('pointer-events-auto flex flex-wrap items-center gap-2 lg:gap-3',
+      lite ? 'min-h-14 rounded-none border-x-0 border-t-0 px-4 py-1.5' : 'py-2.5 pr-3 pl-4')}>
       <div className="flex items-center gap-2.5">
         <Logo />
         <span className="text-[18px] font-extrabold tracking-[-0.3px]">FleetMind</span>
@@ -132,16 +158,32 @@ export function TopBar({ state, user, page, onPage, onSelectVehicle, onAsk, onEv
         )}
       </div>
 
-      <div className="hidden flex-1 xl:block" />
-      <div className="hidden gap-1.5 xl:flex" aria-label="Key numbers">
-        {stats.map(([b, t]) => (
-          <span key={t} className="rounded-[12px] bg-chip px-3 py-2 text-[13px] whitespace-nowrap">
-            <b className="num text-[15px]">{b}</b><span className="text-muted-ink">{t}</span>
-          </span>
-        ))}
-      </div>
+      <div className="hidden flex-1 lg:block" />
+      {lite ? state && <StatusPills state={state} /> : (
+        <div className="hidden gap-1.5 xl:flex" aria-label="Key numbers">
+          {stats.map(([b, t]) => (
+            <span key={t} className="rounded-[12px] bg-chip px-3 py-2 text-[13px] whitespace-nowrap">
+              <b className="num text-[15px]">{b}</b><span className="text-muted-ink">{t}</span>
+            </span>
+          ))}
+        </div>
+      )}
 
       {extra}
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-[10px] border border-line px-3 text-[13px] font-bold select-none">
+            <Switch checked={lite} onCheckedChange={onLite} aria-label="Lite mode" />
+            <span className="hidden sm:inline">Lite mode</span>
+          </label>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" className="max-w-64">
+          {liteAuto
+            ? (liteReason ? `On by itself: ${liteReason.toLowerCase()}.` : 'Off: this screen and computer can run the full map.')
+            : 'You set this. To let FleetMind decide again, use the account menu.'}
+        </TooltipContent>
+      </Tooltip>
 
       {(can.admin(user.role) || can.sim(user.role)) && (
         <DropdownMenu>
@@ -191,6 +233,7 @@ export function TopBar({ state, user, page, onPage, onSelectVehicle, onAsk, onEv
             {state?.me.approval_limit_eur != null && <span className="text-[12px] font-medium text-muted-ink">You approve up to €{state.me.approval_limit_eur}</span>}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
+          {!liteAuto && <DropdownMenuItem onSelect={onLiteReset} className="rounded-[10px]"><Gauge className="size-4" />Lite mode: let FleetMind decide</DropdownMenuItem>}
           <DropdownMenuItem onSelect={onLogout} className="rounded-[10px]"><LogOut className="size-4" />Sign out</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

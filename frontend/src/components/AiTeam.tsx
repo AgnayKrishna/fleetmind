@@ -41,15 +41,16 @@ export function AiTeam({ state, log, showGtm, rail, className, style }: {
 
   if (rail) {
     return (
-      <Panel aria-label="Your AI team" style={style} className={cn('flex w-14 flex-col items-center gap-2.5 py-3', className)}>
+      <Panel aria-label="Your AI team" style={style} className={cn('flex w-14 flex-col items-center gap-2 rounded-[14px] py-2', className)}>
         {team.map(t => {
           const s = status(t.agent)
           return (
-            <div key={t.agent} className="relative" title={`${t.name} (${t.role}): ${s.text}`}>
-              <div className={cn('flex size-[38px] items-center justify-center rounded-full font-extrabold',
-                t.name === 'Atlas' ? 'bg-amber text-on-amber' : 'bg-chip')}>{t.name[0]}</div>
-              <span className="absolute -right-0.5 -bottom-0.5 size-3 rounded-full border-2 border-[var(--fm-solid)]"
-                style={{ background: s.amber ? 'var(--fm-amber)' : s.busy ? 'var(--fm-good)' : 'var(--fm-park-dot)' }} />
+            <div key={t.agent} role="img" aria-label={`${t.name}, ${s.text}`} title={`${t.name} (${t.role}): ${s.text}`}
+              className="relative flex size-10 items-center justify-center rounded-[12px] bg-chip text-[14px] font-extrabold">
+              {t.name[0]}
+              {/* waiting for you = violet ("needs watching"); amber never shows a status */}
+              <span className="absolute top-0.5 right-0.5 size-2 rounded-full ring-2 ring-[var(--fm-solid)]"
+                style={{ background: s.amber ? 'var(--fm-watch)' : s.busy ? 'var(--fm-good)' : 'var(--fm-park-dot)' }} />
             </div>
           )
         })}
