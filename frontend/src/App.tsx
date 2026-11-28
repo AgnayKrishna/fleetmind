@@ -3,8 +3,9 @@ import { AnimatePresence } from 'motion/react'
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { api, logout, me, onLoginRequired } from '@/lib/api'
-import { can, type AttentionItem } from '@/lib/fleet'
+import { api, ApiError, logout, me, onLoginRequired } from '@/lib/api'
+import { EmptyFleet, LoadError, OfflineBanner, ServiceAlerts, serviceAlerts, type QueuedChange } from '@/components/States'
+import { can, hhmm, type AttentionItem } from '@/lib/fleet'
 import type { AiAction, Approval, User } from '@/lib/types'
 import { useFleet } from '@/hooks/useFleet'
 import { useTheme } from '@/hooks/useTheme'
@@ -18,7 +19,7 @@ import { VehicleSheet } from '@/components/VehicleSheet'
 import { ApprovalDialog, MessageDialog } from '@/components/Dialogs'
 import { Chat } from '@/components/Chat'
 import { VehicleSymbols } from '@/components/VehicleSymbols'
-import { Btn, Panel } from '@/components/fm'
+import { Btn } from '@/components/fm'
 import { Plus } from 'lucide-react'
 import { OrdersPage } from '@/pages/Orders'
 import { cn } from '@/lib/utils'
@@ -34,6 +35,20 @@ const pageFromHash = (): Page => {
 }
 
 function errText(e: unknown) { return e instanceof Error ? e.message : String(e) }
+
+/** "Approve A3", "Assign J12", ... for the offline queue. */
+function changeLabel(path: string) {
+  const p = decodeURIComponent(path)
+  const id = (re: RegExp) => re.exec(p)?.[1] ?? ''
+  if (p.startsWith('/api/approvals/')) return `Decision ${id(/approvals\/([^/]+)/)}`
+  if (p.endsWith('/assign')) return `Assign ${id(/orders\/([^/]+)/)}`
+  if (p.endsWith('/undo')) return `Undo ${id(/actions\/([^/]+)/)}`
+  if (p.endsWith('/message')) return `Message ${id(/vehicles\/([^/]+)/)}`
+  if (p.endsWith('/energy_stop')) return `Fuel stop ${id(/vehicles\/([^/]+)/)}`
+  if (p === '/api/orders') return 'New order'
+  if (p === '/api/event') return 'Simulated event'
+  return 'Change'
+}
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null)
@@ -94,13 +109,42 @@ export default function App() {
     if (v) setFocus({ lon: v.lon, lat: v.lat, zoom: 10, key: Date.now() })
   }, [feed.state, setPage])
 
+  // Offline: changes wait in a queue and send by themselves when the connection is back.
+  const [queued, setQueued] = useState<QueuedChange[]>([])
+  const enqueue = useCallback((path: string, body: unknown) => {
+    setQueued(q => [...q, { path, body, label: changeLabel(path) }])
+    toast('Saved. It sends as soon as you’re back online.')
+  }, [])
+  const flushing = useRef(false)
+  useEffect(() => {
+    if (feed.offline || !queued.length || flushing.current) return
+    flushing.current = true
+    ;(async () => {
+      const todo = queued
+      setQueued([])
+      let sent = 0
+      for (const c of todo) {
+        try { await api(c.path, c.body); sent++ } catch (e) {
+          if (e instanceof ApiError) toast.error(`${c.label}: ${e.message}`)
+          else { setQueued(q => [...q, c]); continue }     // still no connection: keep it
+        }
+      }
+      if (sent) toast.success(`Back online. Sent ${sent} waiting ${sent === 1 ? 'change' : 'changes'}.`)
+      feed.refresh()
+      flushing.current = false
+    })()
+  }, [feed.offline, queued, feed.refresh])
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set())
+
   async function write<T>(path: string, body: unknown, ok?: string): Promise<T | null> {
+    if (feed.offline) { enqueue(path, body); return null }
     try {
       const r = await api<T>(path, body)
       if (ok) toast.success(ok)
       feed.refresh()
       return r
     } catch (e) {
+      if (!(e instanceof ApiError)) { enqueue(path, body); return null }    // network error, not a refusal
       toast.error(errText(e))
       return null
     }
@@ -134,6 +178,7 @@ export default function App() {
   if (!user) return <><VehicleSymbols /><Login onSignedIn={setUser} /></>
   if (user.role === 'driver') return null
 
+  const alerts = s ? serviceAlerts(s).filter(a => !dismissed.has(a.key)) : []
   const sheetPad = vehicle ? (lite ? 120 : 260) : 40
   const gap = lite ? 12 : 20
   const panelTop = lite ? topH + 12 : topH + 20 + 16
@@ -159,6 +204,12 @@ export default function App() {
             onEvent={type => write('/api/event', { type, vehicle_id: selected }, 'Event started. Watch the AI team.')}
             onControl={(action, value) => write('/api/control', { action, value })}
             theme={theme} onTheme={toggle} onLogout={async () => { await logout(); setUser(null) }} />
+          {(feed.offline || alerts.length > 0) && (
+            <div className={cn('mx-auto mt-2 flex w-[min(640px,calc(100%-24px))] flex-col gap-2', lite && 'mt-3')}>
+              {feed.offline && <OfflineBanner since={s ? hhmm(s.clock) : null} queued={queued} onRetry={feed.refresh} />}
+              {!feed.offline && <ServiceAlerts alerts={alerts} onDismiss={k => setDismissed(d => new Set(d).add(k))} />}
+            </div>
+          )}
         </div>
 
         {s && page === 'map' && (
@@ -201,9 +252,15 @@ export default function App() {
           </main>
         )}
 
+        {s && page === 'map' && s.vehicles.length === 0 && (
+          <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center">
+            <EmptyFleet className="pointer-events-auto" />
+          </div>
+        )}
+
         {!s && (
           <div className="absolute inset-0 z-10 grid place-items-center">
-            <Panel className="p-6 text-muted-ink">{feed.error ? `Can't reach the backend: ${feed.error}` : 'Loading the fleet…'}</Panel>
+            <LoadError error={feed.error} onRetry={feed.refresh} />
           </div>
         )}
       </div>

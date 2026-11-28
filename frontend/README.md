@@ -15,7 +15,10 @@ npm --prefix frontend install <package>
 npx shadcn@latest add <names> --cwd frontend --yes
 ```
 
-`build` currently writes to `frontend/dist` (ignored by git).
+`build` writes into `../docs`: `docs/index.html` and `docs/assets/` (committed, because FastAPI and
+GitHub Pages serve `docs/`). Rebuild and commit `docs/` after every frontend change. The build never
+touches `docs/driver.html`, `docs/classic.html` (the old dashboard, kept as a fallback), `config.js`,
+`auth.js` or `vendor/`. `tests/test_frontend.py` checks the built files, so build before running tests.
 
 ## What is installed
 

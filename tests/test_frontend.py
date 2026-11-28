@@ -66,6 +66,19 @@ def test_orders_board_in_bundle():
         assert needle in js, needle
 
 
+def test_states_in_bundle_and_fields_they_read():
+    _, js = bundle()
+    for needle in ("Connect your first truck", "You're offline.", "waiting to send", "Try to reconnect",
+                   "Truck routing is unavailable", "isn’t answering", "Live weather is unavailable", "Try again"):
+        assert needle in js, needle
+    c = TestClient(app)
+    c.post("/api/auth/login", json={"username": "admin", "password": "fleetmind-admin"})
+    s = c.get("/api/state").json()
+    assert isinstance(s["map"]["chain"], list) and s["map"]["chain"]
+    assert {"mode", "errors"} <= s["agents"].keys() and "source" in s["weather"]
+    assert all(v["route_source"] in (None, "tomtom", "here", "osrm", "fallback") for v in s["vehicles"])
+
+
 def test_lite_mode_in_bundle():
     _, js = bundle()
     for needle in ("Lite mode", "fmLite", "(max-width: 1440px), (max-height: 800px)", "prefers-reduced-transparency",

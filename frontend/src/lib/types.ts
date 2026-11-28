@@ -185,7 +185,7 @@ export interface FleetState {
   history: { t: string; cost?: number; delivered: number; late: number }[]
   prices: Record<string, number | string>
   routing: Record<string, number>
-  map: { tomtom_tiles: boolean; attribution: string; provider: string }
+  map: { tomtom_tiles: boolean; attribution: string; provider: string; chain?: string[] }
   agents: AgentStatus
   agent_roles: Record<string, string>
   key_required: boolean
