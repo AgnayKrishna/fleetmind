@@ -258,4 +258,4 @@ Newest at the bottom.
 4. Lite mode turns on for screens of 1440 px wide or less, which covers most laptops, exactly as DESIGN.md says. Is that what you want, or should the limit be lower (e.g. 1280)?
 5. Can I delete `docs/classic.html` and the old `docs/app.js`/`style.css` once the new dashboard is approved?
 
-**Push:** see the line below.
+**Push:** `git push origin nightly` succeeded (`cb1d29f..dc6420f`, plus this line). `main` was not touched.
