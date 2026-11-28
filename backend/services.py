@@ -236,16 +236,19 @@ get_routes = plan_routes      # the sim calls get_routes; tests may swap it for 
 
 _tile_cache = {}
 _tile_lock = threading.Lock()
+TILE_CACHE_S = 600          # tiles are kept in memory for 10 minutes
 
 
 def tomtom_tile(layer, z, x, y):
-    """Fetch one TomTom map tile with the server-side key (cached ~5 min). Returns PNG bytes or None."""
+    """Fetch one TomTom map tile with the server-side key (cached 10 min). Returns PNG bytes or None."""
     if layer not in TOMTOM_TILES or not _key("TOMTOM_API_KEY") or not (0 <= z <= 20):
+        return None
+    if not (0 <= x < 2 ** z and 0 <= y < 2 ** z):
         return None
     k = (layer, z, x, y)
     with _tile_lock:
         hit = _tile_cache.get(k)
-        if hit and time.time() - hit[0] < 300:
+        if hit and time.time() - hit[0] < TILE_CACHE_S:
             return hit[1]
     url = TOMTOM_TILES[layer].format(style="main", z=z, x=x, y=y)
     try:

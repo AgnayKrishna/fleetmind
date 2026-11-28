@@ -1,7 +1,9 @@
 """FleetMind API. Run: uvicorn backend.app:app --port 8000"""
 import os
 import threading
+import time
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
@@ -410,13 +412,78 @@ def gtm_status(lead_id: str, s: GtmStatusIn):
     return gtm.set_status(lead_id, s.status)
 
 
+# ---------- map tile proxy protection ----------
+# The tile proxy has no login (map images can't send a bearer header), so it only answers pages
+# from our own sites (Origin or Referer), limits requests per IP, and caches tiles for 10 minutes.
+DEFAULT_ALLOWED_ORIGINS = "http://localhost,http://127.0.0.1,https://fleetmind-brr9.onrender.com,https://agnaykrishna.github.io"
+TILE_RATE_PER_MIN = int(os.getenv("TILE_RATE_PER_MIN", "600"))   # a full-screen map at one zoom is ~30-60 tiles
+
+
+def _parse_origin(value):
+    """'https://host:port/any/path' -> ('https', 'host', port or None). None if it isn't a URL."""
+    try:
+        u = urlsplit((value or "").strip())
+        if u.scheme not in ("http", "https") or not u.hostname:
+            return None
+        return u.scheme, u.hostname.lower(), u.port
+    except ValueError:
+        return None
+
+
+def allowed_origins():
+    raw = os.getenv("ALLOWED_ORIGINS") or DEFAULT_ALLOWED_ORIGINS
+    return [o for o in (_parse_origin(x) for x in raw.split(",")) if o]
+
+
+def tile_origin_ok(request):
+    """Origin (or Referer) must match ALLOWED_ORIGINS. An entry without a port allows any port.
+    The backend's own pages (same host) are always allowed."""
+    src = _parse_origin(request.headers.get("origin")) or _parse_origin(request.headers.get("referer"))
+    if not src:
+        return False
+    host = (request.headers.get("host") or "").split(":")[0].lower()
+    if host and src[1] == host:
+        return True
+    return any(src[0] == s and src[1] == h and (p is None or p == src[2]) for s, h, p in allowed_origins())
+
+
+class RateLimiter:
+    """Sliding one-minute window per key (client IP)."""
+    def __init__(self, per_min):
+        self.per_min, self._hits, self._lock = per_min, {}, threading.Lock()
+
+    def allow(self, key, now=None):
+        now = time.time() if now is None else now
+        with self._lock:
+            hits = [t for t in self._hits.get(key, ()) if now - t < 60]
+            ok = len(hits) < self.per_min
+            if ok:
+                hits.append(now)
+            self._hits[key] = hits
+            if len(self._hits) > 10000:      # forget idle clients
+                self._hits = {k: v for k, v in self._hits.items() if v and now - v[-1] < 60}
+            return ok
+
+
+tile_limiter = RateLimiter(TILE_RATE_PER_MIN)
+
+
+def client_ip(request):
+    fwd = request.headers.get("x-forwarded-for", "")   # Render / Railway put the real IP first
+    return fwd.split(",")[0].strip() or (request.client.host if request.client else "?")
+
+
 @app.get("/api/map/tile/{layer}/{z}/{x}/{y}.png")
-def map_tile(layer: str, z: int, x: int, y: int):
+def map_tile(request: Request, layer: str, z: int, x: int, y: int):
     """TomTom map / live traffic tiles through the server, so the API key never reaches the browser."""
+    if not tile_origin_ok(request):
+        return Response(status_code=403)
+    if not tile_limiter.allow(client_ip(request)):
+        return Response(status_code=429, headers={"Retry-After": "60"})
     png = services.tomtom_tile(layer, z, x, y)
     if png is None:
         return Response(status_code=404)
-    return Response(png, media_type="image/png", headers={"Cache-Control": "public, max-age=300"})
+    return Response(png, media_type="image/png", headers={"Cache-Control": "public, max-age=600"})
 
 
 @app.get("/api/history/{what}")
