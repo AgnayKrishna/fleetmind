@@ -2,15 +2,24 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#ECEDEF" />
+    <meta name="description" content="FleetMind: your fleet and its AI team on one map." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" />
-    <title>FleetMind</title>
+    <title>FleetMind · Control centre</title>
+    <script>
+      // Paint the saved theme before React starts, so dark mode doesn't flash white.
+      try { if (localStorage.getItem('fmTheme') === 'dark') document.documentElement.classList.add('dark') } catch (e) {}
+    </script>
+    <!-- Backend URL for GitHub Pages (docs/config.js, shared with the driver page). -->
+    <script src="./config.js"></script>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>FleetMind needs JavaScript.</noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

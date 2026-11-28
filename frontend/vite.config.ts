@@ -1,12 +1,40 @@
+import { rmSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 
-// https://vite.dev/config/
+// The build goes straight into ../docs, which FastAPI serves locally and GitHub Pages serves
+// online. emptyOutDir is off so docs/driver.html, docs/classic.html, config.js, auth.js,
+// style.css and vendor/ stay; only our own docs/assets folder is replaced on each build.
+const outDir = fileURLToPath(new URL('../docs', import.meta.url))
+const assetsDir = fileURLToPath(new URL('../docs/assets', import.meta.url))
+
+function cleanOldAssets(): Plugin {
+  return {
+    name: 'fleetmind-clean-assets',
+    apply: 'build',
+    buildStart() { rmSync(assetsDir, { recursive: true, force: true }) },
+  }
+}
+
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  base: './',                    // works at / (FastAPI) and at /fleetmind/ (GitHub Pages)
+  plugins: [react(), tailwindcss(), cleanOldAssets()],
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+  },
+  build: {
+    outDir,
+    emptyOutDir: false,
+    assetsDir: 'assets',
+    chunkSizeWarningLimit: 1600,  // maplibre-gl is about 1 MB on its own
+    rollupOptions: {
+      output: { manualChunks: id => (id.includes('maplibre-gl') ? 'maplibre' : undefined) },
+    },
+  },
+  server: {
+    // npm --prefix frontend run dev: the API runs on uvicorn at :8000
+    proxy: { '/api': 'http://127.0.0.1:8000' },
   },
 })
