@@ -22,6 +22,7 @@ import { Panel } from '@/components/fm'
 import { cn } from '@/lib/utils'
 import { GtmPage } from '@/pages/Gtm'
 import { ReportsPage } from '@/pages/Reports'
+import { FleetPage } from '@/pages/Fleet'
 
 const PAGES: Page[] = ['map', 'fleet', 'orders', 'activity', 'reports', 'gtm']
 const pageFromHash = (): Page => {
@@ -171,7 +172,8 @@ export default function App() {
           <main className="absolute inset-0 z-10 flex flex-col bg-background px-5 pb-5" style={{ paddingTop: panelTop }}>
             {page === 'gtm' && can.gtm(role) && <GtmPage />}
             {page === 'reports' && can.history(role) && <ReportsPage state={s} />}
-            {['fleet', 'orders', 'activity'].includes(page) && (
+            {page === 'fleet' && <FleetPage state={s} log={feed.log} onSelect={selectVehicle} lastOk={feed.lastOk} />}
+            {['orders', 'activity'].includes(page) && (
               <Panel className="p-6">
                 <h1 className="text-[20px] font-extrabold">Coming next</h1>
                 <p className="mt-1 text-muted-ink">This screen is being rebuilt. The <a className="font-bold text-amber-text underline" href="classic.html">classic dashboard</a> still has it.</p>

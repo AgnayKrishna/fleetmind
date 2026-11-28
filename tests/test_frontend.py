@@ -47,6 +47,12 @@ def test_control_centre_features_in_bundle():
         assert needle in js, needle
 
 
+def test_fleet_table_in_bundle():
+    _, js = bundle()
+    for needle in ("Export CSV", "Filter by status", "Search plate, driver or place", "Drive left", "AI note", "text/csv"):
+        assert needle in js, needle
+
+
 def test_lite_mode_in_bundle():
     _, js = bundle()
     for needle in ("Lite mode", "fmLite", "(max-width: 1440px), (max-height: 800px)", "prefers-reduced-transparency",
