@@ -139,8 +139,17 @@ def me(request: Request):
 
 
 # ---------- driver phone view ----------
+class ProofIn(BaseModel):
+    receiver: str | None = None
+    signed: bool = False
+    photos: int = 0          # how many photos the driver took (the images stay on the phone for now)
+    damaged: bool = False
+    note: str | None = None
+
+
 class DriverActionIn(BaseModel):
-    action: str            # arrived | loaded | delivered
+    action: str            # arrived | loaded | delivered | break
+    proof: ProofIn | None = None   # Delivered only
 
 
 class ProblemIn(BaseModel):
@@ -165,7 +174,7 @@ def driver_action(a: DriverActionIn, request: Request):
     vid = _driver_vehicle(request)
     if not vid:
         return JSONResponse({"ok": False, "error": "no vehicle is linked to this driver account"}, status_code=404)
-    r = world.driver_action(vid, a.action, by=request.state.user["name"])
+    r = world.driver_action(vid, a.action, by=request.state.user["name"], proof=a.proof.model_dump() if a.proof else None)
     return r if r["ok"] else JSONResponse(r, status_code=409)
 
 

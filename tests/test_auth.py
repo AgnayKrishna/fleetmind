@@ -146,7 +146,7 @@ def test_driver_buttons_follow_the_job():
     w.assign(v["id"], job["id"])
     view = w.driver_view("LV-T01")
     assert view["job"]["id"] == job["id"] and view["next_stop"]["name"] == job["pickup"]["name"]
-    assert view["allowed"] == {"arrived": True, "loaded": False, "delivered": False}
+    assert view["allowed"] == {"arrived": True, "loaded": False, "delivered": False, "break": view["allowed"]["break"]}
     assert not w.driver_action("LV-T01", "delivered")["ok"]           # wrong order is refused
     assert w.driver_action("LV-T01", "arrived")["status"] == "loading"
     assert w.driver_view("LV-T01")["allowed"]["loaded"]

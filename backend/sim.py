@@ -474,11 +474,13 @@ class World:
         return {"ok": True, "vehicle": vid, "stop": {k: st[k] for k in st if k != "score"}}
 
     # ---------------- driver phone view ----------------
-    DRIVER_ACTIONS = {"arrived": "Arrived", "loaded": "Loaded", "delivered": "Delivered"}
+    DRIVER_ACTIONS = {"arrived": "Arrived", "loaded": "Loaded", "delivered": "Delivered", "break": "Start break"}
+    BREAKABLE = ("to_pickup", "to_dropoff", "to_depot", "to_fuel", "idle")   # not while a route is being planned
 
     def _driver_allowed(self, v):
         st = v["status"]
-        return {"arrived": st in MOVING, "loaded": st == "loading", "delivered": st == "unloading"}
+        return {"arrived": st in MOVING, "loaded": st == "loading", "delivered": st == "unloading",
+                "break": st in self.BREAKABLE}
 
     def driver_view(self, vid):
         """What the driver's phone shows: their vehicle, job, next stop and which buttons work now."""
@@ -514,8 +516,10 @@ class World:
                 "clock": clock_str(self.sim),
             }
 
-    def driver_action(self, vid, action, by="driver"):
-        """Arrived / Loaded / Delivered from the driver's phone. Only valid in the matching state."""
+    def driver_action(self, vid, action, by="driver", proof=None):
+        """Arrived / Loaded / Delivered / Start break from the driver's phone. Only valid in the matching
+        state. proof (Delivered): {"receiver", "signed", "photos", "damaged", "note"}, kept on the order."""
+        damage_note = None
         with self.lock:
             v = self.vehicles.get(vid)
             if not v or action not in self.DRIVER_ACTIONS:
@@ -523,7 +527,12 @@ class World:
             if not self._driver_allowed(v)[action]:
                 return {"ok": False, "error": f"'{self.DRIVER_ACTIONS[action]}' doesn't fit right now "
                                               f"({v['status'].replace('_', ' ')})."}
-            if action == "arrived":
+            if action == "break":
+                v["resume"], v["status"] = (None if v["status"] == "idle" else v["status"]), "break"
+                v["phase_until"] = self.sim + BREAK_MIN
+                v["drive_since_break"] = 0
+                text = f"{vid}: driver {v['driver']} started a {BREAK_MIN} min break."
+            elif action == "arrived":
                 target = self.target_of(v)
                 if v["route"]:
                     v["pos_km"] = v["route_km"]
@@ -535,11 +544,24 @@ class World:
                 text = f"{vid}: driver {v['driver']} confirmed arrival at {where}."
             else:
                 job_id = v["job_id"]
+                if action == "delivered" and proof and job_id in self.jobs:
+                    p = {"receiver": " ".join(str(proof.get("receiver") or "").split())[:80] or None,
+                         "signed": bool(proof.get("signed")), "photos": max(0, min(20, int(proof.get("photos") or 0))),
+                         "damaged": bool(proof.get("damaged")),
+                         "note": " ".join(str(proof.get("note") or "").split())[:300] or None}
+                    self.jobs[job_id]["proof"] = p
+                    if p["damaged"]:
+                        damage_note = p["note"] or "no details"
                 self._finish_phase(v)       # loading -> in transit, unloading -> delivered
                 text = (f"{vid}: driver {v['driver']} confirmed {'loading' if action == 'loaded' else 'delivery'}"
                         f"{f' of {job_id}' if job_id else ''}.")
+                if action == "delivered" and job_id in self.jobs and self.jobs[job_id].get("proof", {}).get("receiver"):
+                    text = text[:-1] + f", received by {self.jobs[job_id]['proof']['receiver']}."
             status = v["status"]
         self.add_log("Dispatch Agent", text + f" (from the driver app, {by})", "decision")
+        if damage_note:
+            self.add_log("Fleet manager", f"Driver of {vid} reported something damaged or missing on delivery: "
+                         f"\"{damage_note}\"", "alert")
         return {"ok": True, "status": status}
 
     # ---------------- per-tick update ----------------
