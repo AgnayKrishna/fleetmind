@@ -64,6 +64,7 @@ PERMISSIONS = [
     ("POST", r"/api/event", ADMIN),
     ("POST", r"/api/approvals/[^/]+", DISPATCH),          # employee: up to the approval limit
     ("POST", r"/api/actions/[^/]+/undo", DISPATCH),       # employee: own trucks only
+    ("GET", r"/api/orders/board", STAFF),       # prices stripped for everyone but the company admin
     ("POST", r"/api/orders", DISPATCH),
     ("POST", r"/api/orders/[^/]+/assign", DISPATCH),
     ("POST", r"/api/vehicles/[^/]+/message", DISPATCH),

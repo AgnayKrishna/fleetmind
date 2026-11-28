@@ -16,7 +16,8 @@ from . import auth, llm, services
 from .agents import AGENTS, AgentTeam
 from .db import Store
 from .gtm import GtmAgent
-from .sim import World
+from .data import LOCATIONS
+from .sim import World, clock_str
 
 def _load_dotenv(path=Path(__file__).resolve().parent.parent / ".env"):
     """KEY=value lines from .env (TOMTOM_API_KEY, HERE_API_KEY, ...). Never overrides real env vars,
@@ -375,6 +376,30 @@ def create_order(o: OrderIn, request: Request):
     r = world.create_order(o.pickup, o.dropoff, o.weight, o.cargo,
                            "urgent" if o.priority == "urgent" else "normal", by=request.state.user["name"])
     return r if r["ok"] else JSONResponse(r, status_code=422)
+
+
+@app.get("/api/orders/board")
+def orders_board(request: Request):
+    """Extra data for the orders board: the places you can pick in New order, the vehicle the
+    rules engine suggests for each waiting order, and today's delivered orders."""
+    user = request.state.user
+    with world.lock:
+        suggestions = {}
+        for j in world.jobs.values():
+            if j["status"] == "pending":
+                c = world.dispatch_candidates(j, limit=1)
+                if c:
+                    suggestions[j["id"]] = {k: c[0][k] for k in ("vehicle", "type", "driver", "deadhead_km", "eta",
+                                                                 "on_time", "energy_cost_eur")}
+        delivered = [j | {"delivered_str": clock_str(j["delivered_at"])[-5:] if j.get("delivered_at") else None}
+                     for j in world.jobs.values() if j["status"] == "delivered"][-30:]
+    if user["role"] not in auth.ADMIN_VIEW:
+        delivered = [{k: v for k, v in j.items() if k not in auth.PRICE_FIELDS} for j in delivered]
+    if user["role"] == "superadmin":         # no trip costs in the support view
+        for s in suggestions.values():
+            s.pop("energy_cost_eur", None)
+    places = [{"key": k, "name": v[0]} for k, v in LOCATIONS.items()]
+    return {"ok": True, "places": places, "suggestions": suggestions, "delivered": list(reversed(delivered))}
 
 
 @app.post("/api/orders/{jid}/assign")

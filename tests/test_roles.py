@@ -198,6 +198,24 @@ def test_employee_energy_stop_only_on_own_trucks():
     assert r.status_code == 403
 
 
+def test_orders_board_hides_prices_from_employees():
+    admin = client_for("admin")
+    jid = admin.post("/api/orders", json={"pickup": "SALASPILS", "dropoff": "OLAINE", "weight": 500}).json()["job"]["id"]
+    with app_world.lock:                 # one delivered order to look at
+        j = app_world.jobs[jid]
+        j["status"], j["delivered_at"], j["vehicle"] = "delivered", app_world.sim, "LV-T01"
+    a = admin.get("/api/orders/board").json()
+    assert a["ok"] and "SALASPILS" in {p["key"] for p in a["places"]} and all(p["name"] for p in a["places"])
+    mine = next(d for d in a["delivered"] if d["id"] == jid)
+    assert "price_eur" in mine and mine["delivered_str"]
+    for s in a["suggestions"].values():
+        assert {"vehicle", "eta", "deadhead_km", "on_time"} <= s.keys()
+    e = client_for("employee").get("/api/orders/board").json()
+    assert all("price_eur" not in d for d in e["delivered"])
+    assert all("energy_cost_eur" not in s for s in client_for("super").get("/api/orders/board").json()["suggestions"].values())
+    assert TestClient(app).get("/api/orders/board").status_code == 401
+
+
 def test_undo_really_reverts_an_automatic_assignment():
     """What the AI activity screen's Undo calls: the order goes back to the queue and the truck stops."""
     r = client_for("admin").post("/api/orders", json={"pickup": "FREEPORT", "dropoff": "KEKAVA", "weight": 800})

@@ -18,7 +18,9 @@ import { VehicleSheet } from '@/components/VehicleSheet'
 import { ApprovalDialog, MessageDialog } from '@/components/Dialogs'
 import { Chat } from '@/components/Chat'
 import { VehicleSymbols } from '@/components/VehicleSymbols'
-import { Panel } from '@/components/fm'
+import { Btn, Panel } from '@/components/fm'
+import { Plus } from 'lucide-react'
+import { OrdersPage } from '@/pages/Orders'
 import { cn } from '@/lib/utils'
 import { GtmPage } from '@/pages/Gtm'
 import { ReportsPage } from '@/pages/Reports'
@@ -45,6 +47,7 @@ export default function App() {
   const [approvalId, setApprovalId] = useState<string | null>(null)
   const [msgFor, setMsgFor] = useState<string | null>(null)
   const [chat, setChat] = useState<{ open: boolean; q: { text: string; key: number } | null }>({ open: false, q: null })
+  const [newOrder, setNewOrder] = useState(false)
   const liteMode = useLite()
   const lite = liteMode.lite
   const top = useRef<HTMLDivElement>(null)
@@ -148,6 +151,9 @@ export default function App() {
         <div ref={top} className={cn('pointer-events-none absolute z-20',
           lite ? 'top-0 right-0 left-0' : 'top-5 right-5 left-5 max-[900px]:fixed max-[900px]:top-2 max-[900px]:right-2 max-[900px]:left-2')}>
           <TopBar state={s} user={user} page={page} onPage={setPage} onSelectVehicle={selectVehicle}
+            extra={page === 'orders' && canWrite
+              ? <Btn tone="primary" className="h-[42px] min-h-0 rounded-[12px]" onClick={() => setNewOrder(true)}><Plus className="size-4" />New order</Btn>
+              : undefined}
             lite={lite} liteAuto={liteMode.auto} liteReason={liteMode.reason} onLite={liteMode.toggle} onLiteReset={liteMode.reset}
             onAsk={q => setChat({ open: true, q: { text: q, key: Date.now() } })}
             onEvent={type => write('/api/event', { type, vehicle_id: selected }, 'Event started. Watch the AI team.')}
@@ -182,10 +188,15 @@ export default function App() {
             {page === 'fleet' && <FleetPage state={s} log={feed.log} onSelect={selectVehicle} lastOk={feed.lastOk} />}
             {page === 'activity' && <ActivityPage state={s} log={feed.log} onSelectVehicle={selectVehicle} onUndo={undoAction} />}
             {page === 'orders' && (
-              <Panel className="p-6">
-                <h1 className="text-[20px] font-extrabold">Coming next</h1>
-                <p className="mt-1 text-muted-ink">This screen is being rebuilt. The <a className="font-bold text-amber-text underline" href="classic.html">classic dashboard</a> still has it.</p>
-              </Panel>
+              <OrdersPage state={s} canWrite={canWrite} newOrder={newOrder} onNewOrderClose={() => setNewOrder(false)}
+                onAssign={async (jid, vid) => !!(await write<{ ok: boolean }>(`/api/orders/${encodeURIComponent(jid)}/assign`, { vehicle_id: vid ?? null },
+                  vid ? `${jid} assigned to ${vid}` : `${jid} assigned`))}
+                onCreate={async o => {
+                  const r = await write<{ ok: boolean; job: { id: string } }>('/api/orders', o)
+                  if (r?.ok) toast.success(`Order ${r.job.id} created. Dina is looking for a vehicle.`)
+                  return !!r?.ok
+                }}
+                onReview={a => setApprovalId(a.id)} onShowVehicle={selectVehicle} />
             )}
           </main>
         )}

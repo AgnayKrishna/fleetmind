@@ -71,7 +71,8 @@ def test_login_required_and_wrong_password():
 @pytest.mark.parametrize("user,allowed,denied", [
     ("employee", [("GET", "/api/state"), ("POST", "/api/chat"), ("POST", "/api/approvals/A999"),
                   ("GET", "/api/actions"), ("POST", "/api/actions/X999/undo"), ("POST", "/api/orders"),
-                  ("POST", "/api/orders/J1/assign"), ("POST", "/api/vehicles/LV-T01/message")],
+                  ("POST", "/api/orders/J1/assign"), ("POST", "/api/vehicles/LV-T01/message"),
+                  ("GET", "/api/orders/board")],
      [("POST", "/api/event"), ("POST", "/api/control"), ("GET", "/api/gtm"), ("GET", "/api/history/orders"),
       ("GET", "/api/driver/me"), ("GET", "/api/settings"), ("POST", "/api/settings"), ("GET", "/api/users"),
       ("POST", "/api/users/employee/trucks")]),
@@ -87,7 +88,7 @@ def test_login_required_and_wrong_password():
       ("POST", "/api/users/employee/trucks")]),
     ("driver", [("GET", "/api/driver/me")],
      [("GET", "/api/state"), ("POST", "/api/event"), ("POST", "/api/chat"), ("POST", "/api/approvals/A999"),
-      ("GET", "/api/gtm"), ("POST", "/api/orders"), ("GET", "/api/actions")]),
+      ("GET", "/api/gtm"), ("POST", "/api/orders"), ("GET", "/api/actions"), ("GET", "/api/orders/board")]),
 ])
 def test_role_matrix(user, allowed, denied):
     c = client_for(user)
