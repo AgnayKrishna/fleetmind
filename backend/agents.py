@@ -146,13 +146,16 @@ class AgentTeam:
             w.add_log("Orchestrator", f"Low risk, applied automatically: {summary}", "decision",
                       model=model_label("orchestrator") if llm.enabled() else "rules engine")
         else:
+            # Cost impact = the most expensive option on the card. Dispatchers may only decide
+            # approvals up to the company's approval limit (see app.approve).
+            cost = round(max([o.get("cost_eur", 0) for o in options] or [0]), 2)
             with w.lock:
                 w.seq["appr"] += 1
                 aid = f"A{w.seq['appr']}"
                 w.approvals[aid] = {"id": aid, "event": event, "title": title, "summary": summary,
                                     "options": options, "recommended": choice, "state": "pending",
                                     "created": clock_str(w.sim), "notes": notes, "apply": apply,
-                                    "fallback": fallback}
+                                    "fallback": fallback, "cost_eur": cost}
             w.add_log("Orchestrator", f"High risk, needs manager approval ({aid}): {summary}", "approval",
                       model=model_label("orchestrator") if llm.enabled() else "rules engine")
 
@@ -196,6 +199,42 @@ class AgentTeam:
             w.add_log("Dispatch Agent", f"{vid} is no longer free, sending {cands[0]['vehicle']} instead.", "decision")
             return cands[0]["vehicle"]
         return None
+
+    # ================= undo helpers (AI activity) =================
+    @staticmethod
+    def _undo_reroute(vids, zone_id):
+        """Back to the fastest route, straight through the incident."""
+        def undo(w):
+            done = []
+            for vid in vids:
+                x = w.vehicles.get(vid)
+                if not x or zone_id not in x["avoid_zones"]:
+                    continue
+                x["avoid_zones"].discard(zone_id)
+                st = x["after_route"] if x["status"] == "routing" else x["status"]
+                t = w.target_of(x, st)
+                if st in MOVING and t:
+                    w.request_route(x, t["lat"], t["lon"], st)
+                done.append(vid)
+            if not done:
+                return None
+            return f"{', '.join(done)} take the fastest route again and drive through the incident (slower there)."
+        return undo
+
+    @staticmethod
+    def _undo_service_trip(vid):
+        def undo(w):
+            v = w.vehicles.get(vid)
+            heading = v and (v["status"] == "to_depot" or (v["status"] == "routing" and v["after_route"] == "to_depot"))
+            if not heading or not v.get("service_pending") or v["job_id"]:
+                return None
+            v["service_pending"] = False
+            v["status"], v["after_route"] = "idle", None
+            v["route"], v["cum"], v["route_km"], v["pos_km"] = [], [], 0.0, 0.0
+            v["route_token"] += 1
+            v["service_snooze_until"] = w.sim + 240
+            return f"{vid} stays available for jobs; the Maintenance Agent asks again in 4 hours."
+        return undo
 
     # ================= events =================
     def _target_of(self, v):
@@ -242,7 +281,11 @@ class AgentTeam:
         situation = {"incident": zone["label"], "affected": affected, "sim_time": clock_str(w.sim)}
         rule = {"id": "reroute_all", "why": f"A 22 min delay per vehicle risks time windows; detour costs only about EUR {extra_cost}."}
 
+        for o in options:
+            o["cost_eur"] = extra_cost if o["id"] == "reroute_all" else 0
+
         def apply(choice):
+            moved = []
             with w.lock:
                 for a in affected:
                     if choice == "wait" or (choice == "reroute_urgent" and not a["urgent"]):
@@ -253,7 +296,12 @@ class AgentTeam:
                     x["avoid_zones"].add(zone["id"])
                     t = self._target_of(x)
                     w.request_route(x, t["lat"], t["lon"], x["status"], alternatives=True, pick=1)
-            w.add_log("Route Agent", f"Applied '{self._label(options, choice)}' for {len(affected)} vehicle(s).", "decision")
+                    moved.append(x["id"])
+            text = f"Applied '{self._label(options, choice)}' for {len(affected)} vehicle(s)."
+            w.add_log("Route Agent", text, "decision")
+            if moved:
+                w.record_action("Route Agent", f"Rerouted {', '.join(moved)} around {zone['label']}.", moved,
+                                undo=self._undo_reroute(moved, zone["id"]))
 
         self._decide("traffic", f"Traffic incident near {place}", situation, "Route Agent", options, rule,
                      [("Fuel & Cost Agent", f"Detour adds {extra_km:.0f} km (about EUR {extra_cost} fuel); a late delivery costs EUR {PRICES['late_penalty_eur']}.")],
@@ -283,6 +331,10 @@ class AgentTeam:
             {"id": "hold_long_haul", "label": "Also hold long-haul jobs until the storm passes", "detail": f"{len(long_haul)} pending jobs over 150 km"},
             {"id": "continue", "label": "Continue as planned", "detail": "accept possible late penalties"},
         ]
+        pen = PRICES["late_penalty_eur"]
+        for o in options:   # cost impact: penalties at stake
+            o["cost_eur"] = {"notify_extend": 0, "hold_long_haul": pen * len(long_haul),
+                             "continue": pen * len(at_risk)}[o["id"]]
         situation = {"weather_live": real, "storm": w.storm["label"], "jobs_at_risk": at_risk,
                      "pending_long_haul": long_haul, "electric_vehicles": evs}
         rule = {"id": "notify_extend" if at_risk else "continue",
@@ -300,6 +352,10 @@ class AgentTeam:
                         w.jobs[jid]["hold"] = True
                         w.jobs[jid]["hold_until"] = w.storm["until"] if w.storm else w.sim
             w.add_log("Dispatch Agent", f"Applied '{self._label(options, choice)}'.", "decision")
+            if choice in ("notify_extend", "hold_long_haul") and at_risk:
+                # customers have been told: a message already sent can't be taken back
+                w.record_action("Dispatch Agent", f"Told {len(at_risk)} customer(s) about weather delays and "
+                                "extended their time windows by 60 min.", sorted({r["vehicle"] for r in at_risk}))
 
         self._decide("weather", "Severe weather warning for Latvia", situation, "Route Agent", options, rule,
                      [("Maintenance Agent", f"Cold weather: check tyres and brakes on trucks; {len(evs)} EVs lose about 20% range below 0°C."),
@@ -343,9 +399,12 @@ class AgentTeam:
             return
         options = [{"id": f"assign:{c['vehicle']}", "label": f"Send {c['vehicle']} ({c['type']})",
                     "detail": f"{c['deadhead_km']} km away, ETA {c['eta'][-5:]}, {'on time' if c['on_time'] else 'LATE'}, "
-                              f"EUR {c['energy_cost_eur']}"} for c in cands]
+                              f"EUR {c['energy_cost_eur']}",
+                    "cost_eur": round(c["energy_cost_eur"] + (0 if c["on_time"] else PRICES["late_penalty_eur"]), 2)}
+                   for c in cands]
         options.append({"id": "wait_repair", "label": f"Wait for {v['id']} to be repaired",
-                        "detail": f"about {repair_min + 30} min delay"})
+                        "detail": f"about {repair_min + 30} min delay",
+                        "cost_eur": PRICES["late_penalty_eur"] if job and job["priority"] == "urgent" else 0})
         situation = {"broken_vehicle": v["id"], "fault": fault, "repair_min": repair_min, "repair_cost_eur": total_cost,
                      "job": {k: job[k] for k in ("id", "weight", "cargo", "priority")} | {
                          "window_end": clock_str(job["window_end"]), "cargo_on_board": bool(job.get("transfer_from"))},
@@ -399,7 +458,9 @@ class AgentTeam:
             return
         options = [{"id": f"assign:{c['vehicle']}", "label": f"Send {c['vehicle']} ({c['type']})",
                     "detail": f"{c['deadhead_km']} km away, ETA {c['eta'][-5:]}, {'on time' if c['on_time'] else 'LATE'}"
-                              + (f", bumps {c['bumps_job']}" if c['bumps_job'] else "")} for c in cands]
+                              + (f", bumps {c['bumps_job']}" if c['bumps_job'] else ""),
+                    "cost_eur": round(c["energy_cost_eur"] + (0 if c["on_time"] else PRICES["late_penalty_eur"])
+                                      + (PRICES["late_penalty_eur"] if c["bumps_job"] else 0), 2)} for c in cands]
         situation = {"urgent_job": {k: job[k] for k in ("id", "weight", "cargo")} | {
             "from": job["pickup"]["name"], "to": job["dropoff"]["name"], "deadline": clock_str(job["window_end"])},
             "candidates": cands}
@@ -425,8 +486,11 @@ class AgentTeam:
                         return
                     c = dict(c, vehicle=vid)
                 w.assign(vid, jid, bump=c["bumps_job"])
-            w.add_log("Dispatch Agent", f"{jid} assigned to {c['vehicle']}" +
-                      (f"; {c['bumps_job']} returned to the queue." if c["bumps_job"] else "."), "decision")
+            text = f"{jid} assigned to {c['vehicle']}" + (f"; {c['bumps_job']} returned to the queue."
+                                                         if c["bumps_job"] else ".")
+            w.add_log("Dispatch Agent", text, "decision")
+            w.record_action("Dispatch Agent", f"Urgent order {text}", [c["vehicle"]],
+                            undo=w._undo_assignment(c["vehicle"], jid), job=jid)
 
         self._decide("urgent_order", f"Urgent order {jid}", situation, "Dispatch Agent", options, rule,
                      [("Route Agent", f"Best ETA {best['eta'][-5:]} vs deadline {clock_str(job['window_end'])[-5:]}."),
@@ -449,7 +513,7 @@ class AgentTeam:
             self.next_scan = now + 90
             sent = 0
             for v in w.vehicles.values():
-                if v["status"] != "idle" or sent >= 2:
+                if v["status"] != "idle" or sent >= 2 or now < v.get("service_snooze_until", 0):
                     continue
                 due = v["service_km"] - v["km_since_service"]
                 if due < 1500 or v["health"] < 45:
@@ -458,8 +522,10 @@ class AgentTeam:
                     w.request_route(v, d["lat"], d["lon"], "to_depot")
                     sent += 1
                     w.kpi["auto_decisions"] += 1
-                    w.add_log("Maintenance Agent", f"{v['id']} due for service ({max(0, due)} km left, health "
-                              f"{v['health']}%). Sent to {d['name']} while idle.", "decision")
+                    text = (f"{v['id']} due for service ({max(0, due)} km left, health "
+                            f"{v['health']}%). Sent to {d['name']} while idle.")
+                    w.add_log("Maintenance Agent", text, "decision")
+                    w.record_action("Maintenance Agent", text, [v["id"]], undo=self._undo_service_trip(v["id"]))
             for v in w.vehicles.values():
                 if v["use_mult"] > 1.2 and not v.get("anomaly_flagged") and v["trip_km"] > 20:
                     v["anomaly_flagged"] = True

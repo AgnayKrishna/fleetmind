@@ -45,9 +45,11 @@ class World:
         self.weather_real_at = 0.0
         self.kpi = dict(delivered=0, late=0, km=0.0, diesel_l=0.0, kwh=0.0, fuel_cost=0.0,
                         energy_cost=0.0, co2_kg=0.0, penalties=0.0, repairs=0.0, fuel_savings=0.0,
-                        auto_decisions=0, approvals_done=0, llm_decisions=0)
+                        auto_decisions=0, approvals_done=0, llm_decisions=0, revenue=0.0)
         self.history = []
-        self.seq = {"job": max(100, job_seq), "log": 0, "appr": appr_seq, "zone": 0}   # db continues numbering
+        self.actions = {}            # AI actions that can be undone (AI activity screen)
+        self.messages = deque(maxlen=300)   # dispatcher -> driver messages
+        self.seq = {"job": max(100, job_seq), "log": 0, "appr": appr_seq, "zone": 0, "act": 0, "msg": 0}
         self.next_job_at = self.sim + 20
         self.next_history = self.sim
         self.periodic_hook = None    # set by agents: called with (world, sim) every tick
@@ -114,9 +116,109 @@ class World:
                 "priority": "urgent" if urgent else "normal", "status": "pending", "vehicle": None,
                 "created": self.sim, "window_end": self.sim + est + slack, "est_km": km,
                 "delivered_at": None, "late": False, "customer_notified": False,
+                # what the customer pays (admin only: dispatchers never see customer prices)
+                "price_eur": round((80 + km * 1.15 + weight / 1000 * 9) * (1.4 if urgent else 1.0)),
+                "exclude": [],       # vehicles an undo took this job away from
             }
             self.jobs[jid]["hazmat"] = self.jobs[jid]["cargo"] in HAZMAT_CARGO
             return self.jobs[jid]
+
+    def create_order(self, pickup, dropoff, weight, cargo=None, priority="normal", by=None):
+        """A dispatcher or admin types in a new order. It goes into the queue like any other."""
+        if pickup not in LOCATIONS or dropoff not in LOCATIONS or pickup == dropoff:
+            return {"ok": False, "error": "pick two different known places"}
+        if not 1 <= int(weight) <= 40000:
+            return {"ok": False, "error": "weight must be 1 to 40000 kg"}
+        with self.lock:
+            job = self.new_job(urgent=priority == "urgent", pickup=pickup, dropoff=dropoff, weight=int(weight))
+            if cargo:
+                job["cargo"] = str(cargo)[:80]
+                job["hazmat"] = job["cargo"] in HAZMAT_CARGO
+            job["created_by"] = by
+        self.add_log("Fleet manager", f"{by or 'Fleet manager'} created order {job['id']}: {job['weight']:,} kg "
+                     f"{job['cargo']}, {job['pickup']['name']} -> {job['dropoff']['name']}.", "approval")
+        return {"ok": True, "job": {k: job[k] for k in ("id", "status", "weight", "cargo", "priority")}}
+
+    def assign_order(self, jid, vid=None, by=None):
+        """Assign a pending order by hand. Only vehicles the rules engine finds feasible are accepted."""
+        with self.lock:
+            job = self.jobs.get(jid)
+            if not job or job["status"] != "pending":
+                return {"ok": False, "error": "order not found or not waiting for a vehicle"}
+            cands = self.dispatch_candidates(job, limit=100)
+            c = next((c for c in cands if c["vehicle"] == vid), None) if vid else (cands[0] if cands else None)
+            if not c:
+                return {"ok": False, "error": f"{vid or 'no vehicle'} can't take {jid} right now "
+                                              "(busy, too small, not enough driver hours or range)"}
+            job["hold"] = False
+            self.assign(c["vehicle"], jid)
+        self.add_log("Fleet manager", f"{by or 'Fleet manager'} assigned {jid} to {c['vehicle']} "
+                     f"({c['deadhead_km']} km away, ETA {c['eta'][-5:]}).", "approval")
+        return {"ok": True, "job": jid, "vehicle": c["vehicle"]}
+
+    # ---------------- AI actions that can be undone ----------------
+    def record_action(self, agent, text, vehicles, undo=None, job=None):
+        """undo: function(world) -> text saying what happens instead, or None if it is too late.
+        No undo = can't be reversed (e.g. a customer message already sent)."""
+        with self.lock:
+            self.seq["act"] += 1
+            aid = f"X{self.seq['act']}"
+            self.actions[aid] = {"id": aid, "agent": agent, "text": text, "t": clock_str(self.sim),
+                                 "vehicles": list(vehicles), "job": job, "state": "done",
+                                 "reversible": undo is not None, "undo": undo}
+            if len(self.actions) > 300:
+                self.actions.pop(next(iter(self.actions)))
+            return aid
+
+    def undo_action(self, aid, by=None):
+        with self.lock:
+            a = self.actions.get(aid)
+            if not a:
+                return {"ok": False, "error": "unknown action"}
+            if a["state"] != "done" or not a["undo"]:
+                return {"ok": False, "error": "already undone" if a["state"] == "undone" else "this one can't be undone"}
+            instead = a["undo"](self)
+            if instead is None:
+                return {"ok": False, "error": "too late to undo: the vehicle has moved on"}
+            a["state"], a["undone_by"], a["instead"], a["undone_at"] = "undone", by, instead, clock_str(self.sim)
+        self.add_log("Fleet manager", f"{by or 'Fleet manager'} undid {aid} ({a['agent']}: {a['text']}). {instead}",
+                     "approval")
+        return {"ok": True, "id": aid, "instead": instead}
+
+    def actions_view(self):
+        with self.lock:
+            return [{k: v for k, v in a.items() if k != "undo"} for a in reversed(self.actions.values())]
+
+    def _undo_assignment(self, vid, jid):
+        """Undo for an automatic assignment: only while the vehicle is still on its way to the pickup."""
+        def undo(w):
+            v, job = w.vehicles.get(vid), w.jobs.get(jid)
+            if not v or not job or job["status"] != "assigned" or job["vehicle"] != vid or v["job_id"] != jid:
+                return None
+            if v.get("fuel_stop"):
+                return None
+            job["status"], job["vehicle"] = "pending", None
+            job.setdefault("exclude", []).append(vid)
+            v["job_id"], v["status"], v["after_route"] = None, "idle", None
+            v["route"], v["cum"], v["route_km"], v["pos_km"] = [], [], 0.0, 0.0
+            v["route_token"] += 1           # a route still being calculated is ignored
+            return f"{jid} is back in the queue and won't be given to {vid} again; {vid} stops and waits."
+        return undo
+
+    # ---------------- dispatcher -> driver messages ----------------
+    def send_message(self, vid, text, by=None):
+        text = " ".join(str(text).split())[:500]
+        if vid not in self.vehicles:
+            return {"ok": False, "error": "unknown vehicle"}
+        if not text:
+            return {"ok": False, "error": "empty message"}
+        with self.lock:
+            self.seq["msg"] += 1
+            m = {"id": self.seq["msg"], "vehicle": vid, "from": by or "Dispatcher", "text": text,
+                 "t": clock_str(self.sim)}
+            self.messages.append(m)
+        self.add_log("Fleet manager", f"{by or 'Dispatcher'} messaged the driver of {vid}: \"{text}\"", "info")
+        return {"ok": True, "message": m}
 
     # ---------------- geometry ----------------
     @staticmethod
@@ -186,8 +288,11 @@ class World:
         """Feasible vehicles for a job, best first. Checks capacity, driver hours, range, health."""
         P = origin or job["pickup"]
         out = []
+        excluded = set(job.get("exclude") or ())
         for v in self.vehicles.values():
             bump = None
+            if v["id"] in excluded:
+                continue
             if v["status"] == "idle":
                 pass
             elif allow_bump and v["status"] in ("to_pickup", "routing") and v["job_id"] and not v.get("fuel_stop"):
@@ -405,6 +510,7 @@ class World:
                                                    "name": nxt["name"], "lat": nxt["lat"], "lon": nxt["lon"]},
                 "trip": self._trip_info(v),
                 "allowed": self._driver_allowed(v),
+                "messages": [m for m in self.messages if m["vehicle"] == vid][-10:],
                 "clock": clock_str(self.sim),
             }
 
@@ -505,8 +611,11 @@ class World:
                 self.assign(c["vehicle"], job["id"])
                 self.kpi["auto_decisions"] += 1
                 done += 1
-                self.add_log("Dispatch Agent", f"Assigned {job['id']} ({job['weight']:,} kg) to {c['vehicle']} "
-                             f"({c['type']}, {c['deadhead_km']} km away, ETA {c['eta'][-5:]}).", "decision")
+                text = (f"Assigned {job['id']} ({job['weight']:,} kg) to {c['vehicle']} "
+                        f"({c['type']}, {c['deadhead_km']} km away, ETA {c['eta'][-5:]}).")
+                self.add_log("Dispatch Agent", text, "decision")
+                self.record_action("Dispatch Agent", text, [c["vehicle"]],
+                                   undo=self._undo_assignment(c["vehicle"], job["id"]), job=job["id"])
 
     def _move(self, v, dt):
         spec = VEHICLE_TYPES[v["type"]]
@@ -594,6 +703,7 @@ class World:
         elif st == "unloading" and job:
             job["status"], job["delivered_at"] = "delivered", self.sim
             self.kpi["delivered"] += 1
+            self.kpi["revenue"] += job.get("price_eur", 0)
             if self.sim > job["window_end"]:
                 job["late"] = True
                 self.kpi["late"] += 1
@@ -712,6 +822,8 @@ class World:
             k["on_time_pct"] = round(100 * (k["delivered"] - k["late"]) / k["delivered"]) if k["delivered"] else 100
             k["total_cost"] = round(k["fuel_cost"] + k["energy_cost"] + k["penalties"] + k["repairs"], 2)
             k["cost_per_km"] = round((k["fuel_cost"] + k["energy_cost"]) / k["km"], 3) if k["km"] > 1 else 0
+            k["revenue"] = round(k["revenue"], 2)
+            k["profit"] = round(k["revenue"] - k["total_cost"], 2)
             for key in ("km", "diesel_l", "kwh", "fuel_cost", "energy_cost", "co2_kg", "fuel_savings"):
                 k[key] = round(k[key], 1)
             status_counts = {}

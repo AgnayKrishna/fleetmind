@@ -37,8 +37,11 @@ async function api(path, body) {
   if (!r.ok) throw new Error(r.status);
   return r.json();
 }
-const canOps = () => ["superadmin", "logistics_admin"].includes(FM.user?.role);
+// Roles (design/reference/roles.reference.html). The backend enforces all of this again.
+const canWrite = () => ["logistics_admin", "employee"].includes(FM.user?.role);   // admin + dispatcher
+const isAdmin = () => FM.user?.role === "logistics_admin";
 const isSuper = () => FM.user?.role === "superadmin";
+const money = v => v == null ? "—" : "€" + Math.round(v).toLocaleString();
 
 // ---------- map ----------
 const map = L.map("map", { zoomControl: true }).setView([56.95, 24.3], 8);
@@ -122,8 +125,16 @@ function popup(v) {
     ${v.speed_factor !== null && v.speed_factor < 1 ? `<br>Slowed to ${Math.round(v.speed_factor * 100)}% speed` : ""}
     ${v.route_source ? `<br><span class="pop-src">Route: ${esc(ROUTE_SOURCE[v.route_source] || v.route_source)}` +
       `${v.traffic_delay_min > 0 ? ` · traffic +${Math.round(v.traffic_delay_min)} min` : ""}</span>` : ""}
-    ${v.dims ? `<br><span class="pop-src">${v.dims.height_m} m high · ${v.dims.length_m} m long · ${(v.dims.weight_kg / 1000).toFixed(1)} t max · ${v.dims.axles} axles</span>` : ""}`;
+    ${v.dims ? `<br><span class="pop-src">${v.dims.height_m} m high · ${v.dims.length_m} m long · ${(v.dims.weight_kg / 1000).toFixed(1)} t max · ${v.dims.axles} axles</span>` : ""}
+    ${canWrite() ? `<br><button class="pop-msg" data-vid="${esc(v.id)}">Message driver</button>` : ""}`;
 }
+document.addEventListener("click", async e => {
+  const b = e.target.closest(".pop-msg"); if (!b) return;
+  const text = prompt(`Message to the driver of ${b.dataset.vid}:`);
+  if (!text || !text.trim()) return;
+  try { await api(`/api/vehicles/${encodeURIComponent(b.dataset.vid)}/message`, { text }); b.textContent = "Sent ✓"; }
+  catch { b.textContent = "Couldn't send"; }
+});
 
 function drawMap(s) {
   const seen = new Set();
@@ -213,10 +224,13 @@ function drawKpis(s) {
   const items = [
     [moving + "/" + s.vehicles.length, "vehicles on the road"], [k.delivered, "delivered"],
     [k.on_time_pct + "%", "on time"], [Math.round(k.km).toLocaleString(), "km driven"],
-    ["€" + Math.round(k.fuel_cost + k.energy_cost).toLocaleString(), "fuel + charging"],
-    ["€" + Math.round(k.fuel_savings || 0).toLocaleString(), "saved at cheaper stations"],
-    ["€" + k.cost_per_km.toFixed(2), "energy cost / km"], [Math.round(k.co2_kg).toLocaleString(), "kg CO₂"],
+    [k.fuel_cost == null ? "—" : money(k.fuel_cost + k.energy_cost), "fuel + charging"],
+    [money(k.fuel_savings), "saved at cheaper stations"],
+    [k.cost_per_km == null ? "—" : "€" + k.cost_per_km.toFixed(2), "energy cost / km"], [Math.round(k.co2_kg).toLocaleString(), "kg CO₂"],
     [k.auto_decisions + " / " + k.approvals_done, "auto / approved"]];
+  if (k.revenue != null) items.push([money(k.revenue), "revenue"], [money(k.profit), "profit"]);   // company admin only
+  const me = s.me || {};
+  if (me.trucks) items.push([me.trucks.length, `your trucks · approve up to €${me.approval_limit_eur}`]);
   const g = s.gtm_kpi;
   if (g && !REF) items.push([`${g.leads}/${g.sent}/${g.replies}/${g.opens}`, "leads / sent / replies / demo opens"]);
   $("#kpis").innerHTML = items.map(([b, t]) => `<div class="kpi"><b>${b}</b><span>${t}</span></div>`).join("");
@@ -225,18 +239,18 @@ function drawKpis(s) {
 function drawApprovals(s) {
   const n = s.approvals.length;
   $("#apprCount").textContent = n; $("#apprCount").classList.toggle("zero", n === 0);
-  const key = s.approvals.map(a => a.id).join(",");
+  const key = s.approvals.map(a => a.id + a.can_decide).join(",");
   if (key === approvalsKey) return;
   approvalsKey = key;
   if (!n) { $("#approvals").innerHTML = `<p class="empty">Nothing to approve. Low-risk decisions are applied automatically.</p>`; return; }
   $("#approvals").innerHTML = s.approvals.map(a => `
     <div class="appr" data-id="${a.id}">
       <h3>⚠️ ${esc(a.title)}</h3>
-      <p>${esc(a.summary)}</p>
+      <p>${esc(a.summary)}${a.cost_eur != null ? ` <small>Cost impact up to €${Math.round(a.cost_eur)}</small>` : ""}</p>
       ${a.options.map(o => `<label><input type="radio" name="${a.id}" value="${o.id}" ${o.id === a.recommended ? "checked" : ""}>
         <span>${esc(o.label)}${o.id === a.recommended ? '<span class="rec">RECOMMENDED</span>' : ""}<small>${esc(o.detail || "")}</small></span></label>`).join("")}
-      ${canOps() ? `<div class="btns"><button class="approve">Approve</button><button class="reject">Reject</button></div>`
-        : `<p class="note">A logistics admin decides this one.</p>`}
+      ${a.can_decide ? `<div class="btns"><button class="approve">Approve</button><button class="reject">Reject</button></div>`
+        : `<p class="note">${esc(a.blocked_reason || "A company admin decides this one.")}</p>`}
     </div>`).join("");
 }
 
@@ -270,7 +284,7 @@ function attentionItems(s) {
         btn: "Show", act: "vehicle", id: v.id });
     if (v.energy_pct < LOW_ENERGY_PCT && !v.fuel_stop && !["refuel", "broken", "service"].includes(v.status)) {
       // The Fuel & Cost Agent's pick: cheapest diesel near the route, or the nearest charger for EVs.
-      const st = canOps() ? v.energy_stop : null, ev = v.unit === "kWh";
+      const st = canWrite() && v.mine ? v.energy_stop : null, ev = v.unit === "kWh";
       const btn = !st ? "Show" : ev ? `Charge now · ${st.minutes} min` : `Refuel now · €${st.price_eur_l.toFixed(2)}/L`;
       items.push({ c: "var(--fuel)", kind: "Low energy", text: `${v.id} · ${v.energy_pct}% (${v.range_km} km)`,
         btn, act: st ? "energy" : "vehicle", id: v.id, sample: !!st?.sample,
@@ -322,6 +336,28 @@ $("#attnList").addEventListener("click", async e => {
     const m = jobMarkers[id];
     if (m) { map.setView(m.getLatLng(), Math.max(map.getZoom(), 10)); m.openTooltip(); }
   }
+});
+
+// ---------- AI actions with Undo ----------
+// Admins undo any reversible AI action, dispatchers only those on their own trucks (server checks).
+let actionsKey = "";
+function drawActions(s) {
+  const list = (s.actions || []).slice(0, 12);
+  const key = JSON.stringify(list.map(a => [a.id, a.state, a.can_undo]));
+  if (key === actionsKey) return;
+  actionsKey = key;
+  $("#actions").innerHTML = list.length ? list.map(a => `<div class="act${a.state === "undone" ? " undone" : ""}">
+      <span><b>${esc(a.text)}</b><small>${esc(a.agent)} · ${esc(a.t.slice(-5))}${a.state === "undone"
+        ? ` · undone by ${esc(a.undone_by)}: ${esc(a.instead)}` : !a.reversible ? " · can't be undone" : ""}</small></span>
+      ${a.can_undo ? `<button data-undo="${esc(a.id)}">Undo</button>` : ""}</div>`).join("")
+    : `<p class="empty">No AI actions yet.</p>`;
+}
+$("#actions").addEventListener("click", async e => {
+  const b = e.target.closest("button[data-undo]"); if (!b) return;
+  b.disabled = true; b.textContent = "Undoing…";
+  try { await api(`/api/actions/${encodeURIComponent(b.dataset.undo)}/undo`, {}); }
+  catch { b.textContent = "Too late"; }
+  actionsKey = ""; poll();
 });
 
 // Agent activity filter: null = show every agent, otherwise only that agent's entries.
@@ -382,7 +418,7 @@ function drawFleet(s) {
     const ec = v.energy_pct < 20 ? "var(--bad)" : v.energy_pct < 40 ? "var(--warn)" : "var(--ok)";
     const hc = v.health < 40 ? "var(--bad)" : v.health < 70 ? "var(--warn)" : "var(--ok)";
     return `<tr data-id="${v.id}" style="${selected === v.id ? "background:var(--panel2)" : ""}">
-      <td><b>${v.id}</b></td><td>${v.label}</td>
+      <td><b>${v.id}</b>${s.me?.trucks && v.mine ? `<span class="mine-tag" title="One of your trucks">yours</span>` : ""}</td><td>${v.label}</td>
       <td><span class="st" style="color:${STATUS_COLOR[v.status]}">${STATUS_TEXT[v.status] || v.status}</span></td>
       <td>${v.job_id || "-"}</td>
       <td><span class="bar"><i style="width:${v.energy_pct}%;background:${ec}"></i></span>${v.energy_pct}% ${v.unit}</td>
@@ -406,7 +442,7 @@ function drawChart(s) {
           y1: { position: "right", ticks: { color: "#8b9bb0", precision: 0 }, grid: { display: false } } } } });
   }
   chart.data.labels = h.map(x => x.t);
-  chart.data.datasets[0].data = h.map(x => x.cost);
+  chart.data.datasets[0].data = h.map(x => x.cost ?? null);   // superadmin: no costs
   chart.data.datasets[1].data = h.map(x => x.delivered);
   chart.update();
 }
@@ -542,7 +578,7 @@ async function poll() {
     failures = 0; $("#offline").classList.add("hidden");
     lastState = s;
     if (s.gtm_kpi && !REF) setGtmCount(s.gtm_kpi.leads);
-    applyMapProvider(s.map); drawHeader(s); drawMap(s); drawKpis(s); drawApprovals(s); drawAttention(s); drawLog(s); drawFleet(s); drawChart(s);
+    applyMapProvider(s.map); drawHeader(s); drawMap(s); drawKpis(s); drawApprovals(s); drawAttention(s); drawActions(s); drawLog(s); drawFleet(s); drawChart(s);
   } catch (e) {
     if (++failures > 2) { $("#apiUrl").textContent = API || location.origin; $("#offline").classList.remove("hidden"); }
   }
@@ -550,7 +586,7 @@ async function poll() {
 // Sign in first (auth.js); drivers are sent to their phone view, everyone else gets the dashboard
 // with only the buttons their role may use. The backend enforces the same rules on every endpoint.
 FM.boot("dashboard").then(() => {
-  approvalsKey = ""; attnKey = "";
+  approvalsKey = ""; attnKey = ""; actionsKey = "";
   startGtm();
   setInterval(poll, 1500); poll();
 });

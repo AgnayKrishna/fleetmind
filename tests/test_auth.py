@@ -69,21 +69,30 @@ def test_login_required_and_wrong_password():
 
 
 @pytest.mark.parametrize("user,allowed,denied", [
-    ("employee", [("GET", "/api/state"), ("POST", "/api/chat")],
-     [("POST", "/api/event"), ("POST", "/api/approvals/A999"), ("POST", "/api/control"), ("GET", "/api/gtm"),
-      ("POST", "/api/vehicles/LV-T01/energy_stop"), ("GET", "/api/history/orders"), ("GET", "/api/driver/me")]),
+    ("employee", [("GET", "/api/state"), ("POST", "/api/chat"), ("POST", "/api/approvals/A999"),
+                  ("GET", "/api/actions"), ("POST", "/api/actions/X999/undo"), ("POST", "/api/orders"),
+                  ("POST", "/api/orders/J1/assign"), ("POST", "/api/vehicles/LV-T01/message")],
+     [("POST", "/api/event"), ("POST", "/api/control"), ("GET", "/api/gtm"), ("GET", "/api/history/orders"),
+      ("GET", "/api/driver/me"), ("GET", "/api/settings"), ("POST", "/api/settings"), ("GET", "/api/users"),
+      ("POST", "/api/users/employee/trucks")]),
     ("admin", [("GET", "/api/state"), ("POST", "/api/control"), ("GET", "/api/history/orders"),
-               ("POST", "/api/approvals/A999")],
+               ("POST", "/api/approvals/A999"), ("GET", "/api/settings"), ("POST", "/api/settings"),
+               ("GET", "/api/users"), ("POST", "/api/orders"), ("POST", "/api/event")],
      [("GET", "/api/gtm"), ("POST", "/api/gtm/x/status"), ("GET", "/api/driver/me")]),
-    ("super", [("GET", "/api/state"), ("GET", "/api/gtm"), ("POST", "/api/control")], [("GET", "/api/driver/me")]),
+    ("super", [("GET", "/api/state"), ("GET", "/api/gtm"), ("POST", "/api/control"), ("GET", "/api/settings"),
+               ("GET", "/api/users"), ("GET", "/api/actions")],
+     [("GET", "/api/driver/me"), ("POST", "/api/approvals/A999"), ("POST", "/api/actions/X999/undo"),
+      ("POST", "/api/orders"), ("POST", "/api/orders/J1/assign"), ("POST", "/api/event"), ("POST", "/api/settings"),
+      ("POST", "/api/vehicles/LV-T01/message"), ("POST", "/api/vehicles/LV-T01/energy_stop"), ("POST", "/api/chat"),
+      ("POST", "/api/users/employee/trucks")]),
     ("driver", [("GET", "/api/driver/me")],
      [("GET", "/api/state"), ("POST", "/api/event"), ("POST", "/api/chat"), ("POST", "/api/approvals/A999"),
-      ("GET", "/api/gtm")]),
+      ("GET", "/api/gtm"), ("POST", "/api/orders"), ("GET", "/api/actions")]),
 ])
 def test_role_matrix(user, allowed, denied):
     c = client_for(user)
     bodies = {"/api/chat": {"message": "status"}, "/api/control": {"action": "speed", "value": 2},
-              "/api/event": {"type": "nope"}, "/api/gtm/x/status": {"status": "sent"}}
+              "/api/event": {"type": "nope"}, "/api/gtm/x/status": {"status": "sent"}, "/api/settings": {}}
     for m, p in allowed:
         r = c.request(m, p, json=bodies.get(p, {}))
         assert r.status_code not in (401, 403), f"{user} should reach {m} {p}: {r.status_code}"
@@ -152,7 +161,7 @@ def test_driver_buttons_follow_the_job():
 def test_pages_have_login_and_driver_layout():
     c = client_for()
     html = c.get("/").text
-    assert 'id="login"' in html and 'src="auth.js"' in html and "ops-only" in html
+    assert 'id="login"' in html and 'src="auth.js"' in html and "admin-only" in html and "write-only" in html
     d = c.get("/driver.html").text
     for needle in ('data-action="arrived"', 'data-action="loaded"', 'data-action="delivered"', 'id="dReport"',
                    'name="viewport"'):

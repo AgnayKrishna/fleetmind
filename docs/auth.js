@@ -7,7 +7,7 @@ const FM = (() => {
   const API = (params.get("api") || window.FLEET_API_URL || "").replace(/\/$/, "");
   let token = sessionStorage.getItem("fmToken") || "";
   let user = null, waiting = null;
-  const ROLE_LABEL = { superadmin: "Superadmin", logistics_admin: "Logistics admin", employee: "Employee", driver: "Driver" };
+  const ROLE_LABEL = { superadmin: "Super admin", logistics_admin: "Company admin", employee: "Dispatcher", driver: "Driver" };
   const escH = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const headers = () => (token ? { Authorization: "Bearer " + token } : {});
 

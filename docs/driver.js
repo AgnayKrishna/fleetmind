@@ -46,6 +46,11 @@ function draw(d) {
     <p class="d-route"><span>${esc(j.pickup)}</span><span aria-hidden="true">→</span><span>${esc(j.dropoff)}</span></p>
     <p class="d-sub">Deadline ${esc(j.deadline)}</p>`;
 
+  const msgs = d.messages || [];
+  $("#dMsgs").classList.toggle("hidden", !msgs.length);
+  $("#dMsgsBody").innerHTML = msgs.slice().reverse().map(m =>
+    `<p><b>${esc(m.from)}</b> <span class="d-sub">${esc(m.t.slice(-5))}</span><br>${esc(m.text)}</p>`).join("");
+
   const ec = v.energy_pct < 20 ? "var(--bad)" : v.energy_pct < 40 ? "var(--warn)" : "var(--ok)";
   $("#dVehBody").innerHTML = `
     <p><span class="pill">${esc(STATUS_TEXT[v.status] || v.status)}</span>${v.fault ? ` <span class="pill bad">${esc(v.fault)}</span>` : ""}</p>

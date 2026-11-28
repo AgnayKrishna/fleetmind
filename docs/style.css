@@ -179,8 +179,18 @@ tr { cursor: pointer; } tr:hover td { background: var(--panel2); }
 .lead .note { margin: 0; color: var(--muted); font-size: 11px; }
 
 /* ---------- sign-in and roles ---------- */
-body[data-role="employee"] .ops-only, body[data-role="driver"] .ops-only { display: none !important; }
+/* sim-only: demo speed controls (superadmin + admin). admin-only: event triggers.
+   write-only: things the people running the company do (admin + dispatcher). The backend checks again. */
+body[data-role="employee"] .sim-only, body[data-role="driver"] .sim-only { display: none !important; }
+body:not([data-role="logistics_admin"]) .admin-only { display: none !important; }
+body:not([data-role="logistics_admin"]):not([data-role="employee"]) .write-only { display: none !important; }
 body:not([data-role="superadmin"]) .super-only { display: none !important; }
+.mine-tag { font-size: 10px; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 0 5px; margin-left: 4px; }
+.act { padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 12px; display: flex; gap: 8px; align-items: flex-start; }
+.act > span { flex: 1; }
+.act small { display: block; color: var(--muted); }
+.act.undone > span > b { text-decoration: line-through; color: var(--muted); }
+.act button { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; min-height: 32px; }
 .appr .note { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
 .controls .chip.user { font-family: Inter, system-ui, sans-serif; margin-left: 6px; }
 #logoutBtn { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }

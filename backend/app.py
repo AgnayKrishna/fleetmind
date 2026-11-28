@@ -36,6 +36,9 @@ world = World(seed=int(os.getenv("SEED", "7")), job_seq=job_seq, appr_seq=appr_s
 team = AgentTeam(world)
 gtm = GtmAgent(world, store)
 store.seed_users(auth.DEMO_USERS, auth.hash_password)
+for _u in auth.DEMO_USERS:
+    if _u["role"] == "employee":
+        store.seed_trucks(_u["username"], sorted(world.vehicles)[:auth.EMPLOYEE_DEFAULT_TRUCKS])
 sessions = auth.Sessions()
 threading.Thread(target=world.run_forever, daemon=True).start()
 store.start(world)
@@ -190,6 +193,47 @@ def health():
     return {"ok": True, "agents": llm.status(), "key_required": bool(DEMO_KEY)}
 
 
+# ---------- company settings, dispatcher trucks and the approval limit ----------
+def company_settings():
+    return store.get_settings(auth.DEFAULT_SETTINGS)
+
+
+def own_trucks(user):
+    """The vehicles an employee looks after; None = every vehicle (admins)."""
+    return set(store.trucks_for(user["username"])) if user and user["role"] == "employee" else None
+
+
+def admin_name():
+    return next((u["name"] for u in store.list_users() if u["role"] == "logistics_admin"), "the company admin")
+
+
+def can_decide(user, appr, limit):
+    """(allowed, reason). Admins decide any approval, dispatchers up to the limit, nobody else."""
+    if user["role"] == "logistics_admin":
+        return True, None
+    if user["role"] == "employee":
+        if (appr.get("cost_eur") or 0) <= limit:
+            return True, None
+        return False, f"Over your €{limit:g} limit: sent to {admin_name()} for approval."
+    return False, "Only the company decides its own approvals."
+
+
+def can_undo(user, action):
+    if user["role"] == "logistics_admin":
+        return True
+    if user["role"] == "employee":
+        mine = own_trucks(user)
+        return bool(action["vehicles"]) and set(action["vehicles"]) <= mine
+    return False
+
+
+def actions_for(user):
+    out = world.actions_view()
+    for a in out:
+        a["can_undo"] = a["reversible"] and a["state"] == "done" and can_undo(user, a)
+    return out
+
+
 @app.get("/api/state")
 def state(request: Request, since: int = 0):
     s = world.snapshot(log_after=since)
@@ -198,13 +242,136 @@ def state(request: Request, since: int = 0):
     s["agent_roles"] = AGENTS
     s["key_required"] = bool(DEMO_KEY)
     user = request.state.user
+    role = user["role"]
     s["user"] = user
-    if user["role"] == "superadmin":
+    cfg = company_settings()
+    limit = cfg["approval_limit_eur"]
+    mine = own_trucks(user)
+    s["me"] = {"role": role, "trucks": sorted(mine) if mine is not None else None,
+               "approval_limit_eur": limit if role == "employee" else None,
+               "can_write": role in auth.DISPATCH, "admin_name": admin_name()}
+    s["company"] = {"name": cfg["company_name"]}
+    for a in s["approvals"]:
+        a["can_decide"], a["blocked_reason"] = can_decide(user, a, limit)
+    for v in s["vehicles"]:
+        v["mine"] = mine is None or v["id"] in mine
+    s["actions"] = actions_for(user)[:60]
+    if role != "logistics_admin":          # customer prices, revenue and profit are for the company admin
+        s["jobs"] = [{k: v for k, v in j.items() if k not in auth.PRICE_FIELDS} for j in s["jobs"]]
+        for k in auth.REVENUE_KPIS:
+            s["kpi"].pop(k, None)
+    if role == "superadmin":               # support view: no trip costs or savings either
+        for k in auth.COST_KPIS:
+            s["kpi"][k] = None
+        s["history"] = [{k: v for k, v in h.items() if k != "cost"} for h in s["history"]]
+        for v in s["vehicles"]:
+            if v.get("energy_stop"):
+                v["energy_stop"] = None
+    if role == "superadmin":
         s["gtm_kpi"] = gtm.kpi()
     else:      # sales outreach is for the superadmin only
         s["gtm_kpi"] = None
         s["log"] = [e for e in s["log"] if e["agent"] != "GTM Agent"]
     return s
+
+
+@app.get("/api/actions")
+def actions(request: Request):
+    """AI actions today, newest first, with Undo where it is allowed for you."""
+    return {"ok": True, "actions": actions_for(request.state.user)}
+
+
+@app.post("/api/actions/{aid}/undo")
+def undo_action(aid: str, request: Request):
+    user = request.state.user
+    a = next((x for x in world.actions_view() if x["id"] == aid), None)
+    if not a:
+        return JSONResponse({"ok": False, "error": "unknown action"}, status_code=404)
+    if not can_undo(user, a):
+        return JSONResponse({"ok": False, "error": "you can only undo AI actions on your own trucks"}, status_code=403)
+    r = world.undo_action(aid, by=f"{user['name']} ({user['username']}, {user['role']})")
+    return r if r["ok"] else JSONResponse(r, status_code=409)
+
+
+class SettingsIn(BaseModel):
+    approval_limit_eur: float | None = None
+    company_name: str | None = None
+
+
+@app.get("/api/settings")
+def get_settings():
+    return {"ok": True, "settings": company_settings()}
+
+
+@app.post("/api/settings")
+def set_settings(body: SettingsIn, request: Request):
+    who = request.state.user["name"]
+    if body.approval_limit_eur is not None:
+        if not 0 <= body.approval_limit_eur <= 100000:
+            return JSONResponse({"ok": False, "error": "approval limit must be 0 to 100000 EUR"}, status_code=422)
+        store.set_setting("approval_limit_eur", round(body.approval_limit_eur, 2), by=who)
+        world.add_log("Fleet manager", f"{who} set the dispatcher approval limit to EUR {body.approval_limit_eur:g}.",
+                      "approval")
+    if body.company_name is not None and body.company_name.strip():
+        store.set_setting("company_name", body.company_name.strip()[:80], by=who)
+    return {"ok": True, "settings": company_settings()}
+
+
+@app.get("/api/users")
+def users():
+    return {"ok": True, "users": [u | {"trucks": store.trucks_for(u["username"]) if u["role"] == "employee" else None}
+                                  for u in store.list_users()]}
+
+
+class TrucksIn(BaseModel):
+    vehicle_ids: list[str]
+
+
+@app.post("/api/users/{username}/trucks")
+def set_user_trucks(username: str, body: TrucksIn):
+    u = store.get_user(username)
+    if not u or u["role"] != "employee":
+        return JSONResponse({"ok": False, "error": "only employees have assigned trucks"}, status_code=404)
+    bad = [v for v in body.vehicle_ids if v not in world.vehicles]
+    if bad:
+        return JSONResponse({"ok": False, "error": f"unknown vehicles: {', '.join(bad[:5])}"}, status_code=422)
+    store.set_trucks(u["username"], body.vehicle_ids)
+    return {"ok": True, "trucks": store.trucks_for(u["username"])}
+
+
+class OrderIn(BaseModel):
+    pickup: str
+    dropoff: str
+    weight: int
+    cargo: str | None = None
+    priority: str = "normal"
+
+
+class AssignIn(BaseModel):
+    vehicle_id: str | None = None      # default: the best feasible vehicle
+
+
+class MessageIn(BaseModel):
+    text: str
+
+
+@app.post("/api/orders")
+def create_order(o: OrderIn, request: Request):
+    r = world.create_order(o.pickup, o.dropoff, o.weight, o.cargo,
+                           "urgent" if o.priority == "urgent" else "normal", by=request.state.user["name"])
+    return r if r["ok"] else JSONResponse(r, status_code=422)
+
+
+@app.post("/api/orders/{jid}/assign")
+def assign_order(jid: str, a: AssignIn, request: Request):
+    r = world.assign_order(jid, a.vehicle_id, by=request.state.user["name"])
+    return r if r["ok"] else JSONResponse(r, status_code=409)
+
+
+@app.post("/api/vehicles/{vid}/message")
+def message_driver(vid: str, m: MessageIn, request: Request):
+    r = world.send_message(vid, m.text, by=request.state.user["name"])
+    return r if r["ok"] else JSONResponse(r, status_code=404 if r["error"] == "unknown vehicle" else 422)
 
 
 class GtmStatusIn(BaseModel):
@@ -240,12 +407,16 @@ def map_tile(layer: str, z: int, x: int, y: int):
 
 
 @app.get("/api/history/{what}")
-def history(what: str, limit: int = 100, status: str | None = None):
+def history(request: Request, what: str, limit: int = 100, status: str | None = None):
     """Saved orders, approvals or agent decisions, newest first (kept across restarts)."""
     if what not in ("orders", "approvals", "decisions"):
         return JSONResponse({"ok": False, "error": "use orders, approvals or decisions"}, status_code=404)
     store.sync(world)
-    return {"ok": True, what: store.history(what, limit, status)}
+    rows = store.history(what, limit, status)
+    if what == "orders" and request.state.user["role"] != "logistics_admin":
+        for r in rows:
+            r["data"] = {k: v for k, v in (r.get("data") or {}).items() if k not in auth.PRICE_FIELDS}
+    return {"ok": True, what: rows}
 
 
 @app.post("/api/event")
@@ -255,7 +426,13 @@ def event(e: EventIn):
 
 @app.post("/api/approvals/{aid}")
 def approve(aid: str, a: ApprovalIn, request: Request):
-    return team.resolve(aid, a.option_id, a.approve, by=request.state.user)
+    user = request.state.user
+    appr = world.approvals.get(aid)
+    if appr and appr["state"] == "pending":
+        ok, why = can_decide(user, appr, company_settings()["approval_limit_eur"])
+        if not ok:        # it stays pending for the admin
+            return JSONResponse({"ok": False, "error": why, "sent_to": admin_name()}, status_code=403)
+    return team.resolve(aid, a.option_id, a.approve, by=user)
 
 
 class EnergyStopIn(BaseModel):
@@ -264,6 +441,9 @@ class EnergyStopIn(BaseModel):
 
 @app.post("/api/vehicles/{vid}/energy_stop")
 def energy_stop(request: Request, vid: str, e: EnergyStopIn | None = None):
+    mine = own_trucks(request.state.user)
+    if mine is not None and vid not in mine:
+        return JSONResponse({"ok": False, "error": f"{vid} isn't one of your trucks"}, status_code=403)
     r = world.add_energy_stop(vid, e.station_id if e else None, by=request.state.user["name"])
     return r if r["ok"] else JSONResponse(r, status_code=409)
 

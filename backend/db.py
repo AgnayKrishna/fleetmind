@@ -102,6 +102,22 @@ class User(Base):
     created_at: Mapped[str] = mapped_column(String(32))
 
 
+class Setting(Base):
+    """Company settings the logistics_admin can change (e.g. the dispatcher approval limit)."""
+    __tablename__ = "settings"
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[dict] = mapped_column(JSON)          # {"v": <value>}
+    updated_by: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    updated_at: Mapped[str] = mapped_column(String(32))
+
+
+class TruckAssignment(Base):
+    """Which vehicles a dispatcher (employee) looks after."""
+    __tablename__ = "truck_assignments"
+    username: Mapped[str] = mapped_column(String(64), primary_key=True)
+    vehicle_id: Mapped[str] = mapped_column(String(16), primary_key=True)
+
+
 def _seq(id_str):
     m = re.search(r"\d+", id_str or "")
     return int(m.group()) if m else 0
@@ -152,6 +168,42 @@ class Store:
             u = s.get(User, (username or "").strip().lower())
             return None if u is None else {"username": u.username, "name": u.name, "role": u.role,
                                            "password_hash": u.password_hash, "vehicle_id": u.vehicle_id}
+
+    def list_users(self):
+        with Session(self.engine) as s:
+            return [{"username": u.username, "name": u.name, "role": u.role, "vehicle_id": u.vehicle_id}
+                    for u in s.scalars(select(User).order_by(User.username))]
+
+    # ---------- company settings ----------
+    def get_settings(self, defaults):
+        """defaults with any saved values on top."""
+        with Session(self.engine) as s:
+            saved = {r.key: r.value.get("v") for r in s.scalars(select(Setting))}
+        return {k: saved.get(k, v) for k, v in defaults.items()}
+
+    def set_setting(self, key, value, by=None):
+        with self.wlock, Session(self.engine) as s, s.begin():
+            row = s.get(Setting, key) or Setting(key=key)
+            row.value, row.updated_by, row.updated_at = {"v": value}, by, _now()
+            s.merge(row)
+
+    # ---------- dispatcher truck assignments ----------
+    def trucks_for(self, username):
+        with Session(self.engine) as s:
+            return sorted(r.vehicle_id for r in s.scalars(
+                select(TruckAssignment).where(TruckAssignment.username == username)))
+
+    def set_trucks(self, username, vehicle_ids):
+        with self.wlock, Session(self.engine) as s, s.begin():
+            for r in s.scalars(select(TruckAssignment).where(TruckAssignment.username == username)):
+                s.delete(r)
+            for vid in sorted(set(vehicle_ids)):
+                s.add(TruckAssignment(username=username, vehicle_id=vid))
+
+    def seed_trucks(self, username, vehicle_ids):
+        """First start only: an employee with no assignments yet gets these."""
+        if not self.trucks_for(username):
+            self.set_trucks(username, vehicle_ids)
 
     # ---------- start-up ----------
     def next_seq(self):
