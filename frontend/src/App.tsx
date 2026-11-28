@@ -28,8 +28,9 @@ import { ReportsPage } from '@/pages/Reports'
 import { FleetPage } from '@/pages/Fleet'
 import { ActivityPage } from '@/pages/Activity'
 import { ShiftPage } from '@/pages/Shift'
+import { OverviewPage } from '@/pages/Overview'
 
-const PAGES: Page[] = ['shift', 'map', 'fleet', 'orders', 'activity', 'reports', 'gtm']
+const PAGES: Page[] = ['overview', 'shift', 'map', 'fleet', 'orders', 'activity', 'reports', 'gtm']
 /** null = your home screen: My shift for dispatchers, the map for everyone else. */
 const pageFromHash = (): Page | null => {
   const p = location.hash.replace(/^#\/?/, '') as Page
@@ -59,8 +60,9 @@ export default function App() {
   const feed = useFleet(!!user && user.role !== 'driver')
   const s = feed.state
   const [pageChoice, setPageState] = useState<Page | null>(pageFromHash)
-  const home: Page = user?.role === 'employee' ? 'shift' : 'map'
-  const page: Page = !pageChoice || (pageChoice === 'shift' && user?.role !== 'employee') ? home : pageChoice
+  const home: Page = user?.role === 'employee' ? 'shift' : user?.role === 'superadmin' ? 'overview' : 'map'
+  const notMine = (pageChoice === 'shift' && user?.role !== 'employee') || (pageChoice === 'overview' && user?.role !== 'superadmin')
+  const page: Page = !pageChoice || notMine ? home : pageChoice
   const [selected, setSelected] = useState<string | null>(null)
   const [focus, setFocus] = useState<MapFocus | null>(null)
   const [approvalId, setApprovalId] = useState<string | null>(null)
@@ -240,6 +242,7 @@ export default function App() {
           <main className="absolute inset-0 z-10 flex flex-col bg-background px-5 pb-5" style={{ paddingTop: panelTop }}>
             {page === 'gtm' && can.gtm(role) && <GtmPage />}
             {page === 'reports' && can.history(role) && <ReportsPage state={s} />}
+            {page === 'overview' && role === 'superadmin' && <OverviewPage state={s} />}
             {page === 'shift' && (
               <ShiftPage state={s} log={feed.log} onSelectVehicle={selectVehicle} onReview={a => setApprovalId(a.id)}
                 onAttention={onAttention} onMessage={setMsgFor} />

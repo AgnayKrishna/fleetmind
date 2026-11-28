@@ -89,6 +89,19 @@ def test_dispatcher_shift_in_bundle_and_state():
     assert me["role"] == "employee" and me["trucks"] and me["approval_limit_eur"] is not None and me["admin_name"]
 
 
+def test_super_admin_overview_in_bundle_and_data():
+    _, js = bundle()
+    for needle in ("Platform totals", "Integrations", "Needs your attention", "read only, for support", "Kurzeme Logistika",
+                   "Not connected yet"):
+        assert needle in js, needle
+    c = TestClient(app)
+    c.post("/api/auth/login", json={"username": "super", "password": "fleetmind-super"})
+    s = c.get("/api/state").json()
+    assert s["company"]["name"] and "auto_decisions" in s["kpi"] and isinstance(s["actions"], list)
+    assert c.get("/api/settings").json()["ok"] and c.get("/api/users").json()["ok"]    # read only, for support
+    assert c.post("/api/settings", json={"approval_limit_eur": 1}).status_code == 403
+
+
 def test_lite_mode_in_bundle():
     _, js = bundle()
     for needle in ("Lite mode", "fmLite", "(max-width: 1440px), (max-height: 800px)", "prefers-reduced-transparency",

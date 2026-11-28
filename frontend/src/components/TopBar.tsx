@@ -9,9 +9,10 @@ import type { FleetState, User } from '@/lib/types'
 import { Logo, Panel } from './fm'
 import { VehicleGlyph } from './VehicleSymbols'
 
-export type Page = 'shift' | 'map' | 'fleet' | 'orders' | 'activity' | 'reports' | 'gtm'
+export type Page = 'overview' | 'shift' | 'map' | 'fleet' | 'orders' | 'activity' | 'reports' | 'gtm'
 
 const NAV: { id: Page; label: string; show?: (u: User) => boolean }[] = [
+  { id: 'overview', label: 'Overview', show: u => u.role === 'superadmin' },
   { id: 'shift', label: 'My shift', show: u => u.role === 'employee' },
   { id: 'map', label: 'Map' }, { id: 'fleet', label: 'Fleet' }, { id: 'orders', label: 'Orders' },
   { id: 'activity', label: 'AI activity' }, { id: 'reports', label: 'Reports', show: u => can.history(u.role) },
@@ -105,8 +106,10 @@ export function TopBar({ state, user, page, onPage, onSelectVehicle, onAsk, onEv
   const initials = user.name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
   return (
+    // super admin: dark platform bar (dark tokens scoped to the bar) with the amber "Super admin" chip
     <Panel className={cn('pointer-events-auto flex flex-wrap items-center gap-2 lg:gap-3',
-      lite ? 'min-h-14 rounded-none border-x-0 border-t-0 px-4 py-1.5' : 'py-2.5 pr-3 pl-4')}>
+      lite ? 'min-h-14 rounded-none border-x-0 border-t-0 px-4 py-1.5' : 'py-2.5 pr-3 pl-4', user.role === 'superadmin' && 'dark')}
+      style={user.role === 'superadmin' ? { background: '#18191C', borderColor: 'rgba(255,255,255,0.08)' } : undefined}>
       <div className="flex items-center gap-2.5">
         <Logo />
         <span className="text-[18px] font-extrabold tracking-[-0.3px]">FleetMind</span>
