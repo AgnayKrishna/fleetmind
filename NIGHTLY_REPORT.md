@@ -179,3 +179,83 @@ Newest at the bottom.
 
 **Questions**
 - Is a dashed "Sample data" tag enough, or do you want it more visible (e.g. amber)?
+
+## 2026-11-28 · NIGHT
+
+**Setup:** working tree was clean, on `nightly`, `git merge main` → already up to date. Tasks 1-3 (roles, guest view, tile proxy) were already ticked by the earlier run, which hit the usage limit at 06:30 and left no report section. The unfinished frontend from that run (commit `25426e4`) was a good base, so I kept it and finished it.
+
+**Tests:** `AGENT_MODE=rules .venv/Scripts/python.exe -m pytest tests -q` → **94 passed** (up from 77; 17 new). `npm --prefix frontend run build` passes; `lint` shows warnings only, no errors. I ran the tests and the build before every commit. No paid API was called.
+
+**Done**
+- [x] **Frontend rebuild in Baltic Amber.** One commit per screen, in the order asked:
+  1. **Control centre.** Fixed the 3 type errors that stopped the build. The build now writes `docs/index.html` + `docs/assets/`. The old dashboard moved to `docs/classic.html`, and `driver.html`, `config.js`, `auth.js` and `vendor/` are untouched. The three tests that read the old markup at `/` now read `classic.html`. The new `tests/test_frontend.py` checks the built app.
+  2. **Lite mode.** It switches on by itself when:
+     - the screen is 1440 x 800 or smaller
+     - the computer has 4 or fewer cores, or 4 GB or less memory
+     - the map runs below 30 fps for 3 s
+     - the system asks for reduced motion or transparency
+     
+     The "Lite mode" switch in the top bar overrides it and is remembered. The account menu has "let FleetMind decide" to undo the override. In lite mode: a flat 56 px bar with status pills, solid panels, the AI team as a 56 px rail, Needs you showing 2 items + "Show N more", a small centred sheet, and no trails or gliding.
+  3. **Fleet table.** Status pills with counts, `/` to search, sortable columns, Export CSV, and only the visible rows are drawn, so 100+ vehicles stay fast. Each row has the latest AI note from the log, and clicking a row opens that vehicle on the map.
+  4. **AI activity with real Undo.** Undo calls `POST /api/actions/{id}/undo`. Undone rows are crossed out and say what happens instead. Rows that can't be reversed have no Undo. Undo is only enabled where the backend allows it. A new end-to-end test undoes a real automatic assignment.
+  5. **Orders board.** Five columns.
+     - New cards show the suggested vehicle with an amber Assign button.
+     - Problem cards have a red border and the proposed fix.
+     - The amber "New order" button opens a form.
+     
+     The board needed one new read-only endpoint, `GET /api/orders/board` (staff roles). It returns the places list, the suggestions and today's delivered orders. Prices are removed for everyone but the company admin, and trip costs for the super admin. It is in the permission table and the role matrix tests.
+  6. **Empty, offline and error states.**
+     - Empty fleet: "Connect your first truck" with three ways to connect.
+     - Offline: a dark banner with the time positions are from, and a greyed map. Changes you make wait in a queue ("N changes waiting to send") and send by themselves on reconnect. "Try to reconnect" retries now.
+     - A service fails: a banner says what fell back, based on live data (straight-line routes, OSRM instead of TomTom/HERE, AI not answering, live weather down).
+     - The first load fails: "Can't reach FleetMind" with "Try again".
+- [x] **Role screens.**
+  - **Dispatcher "My shift"** is now the employee's home screen. It shows their trucks (click one to see it on the map, or the speech bubble to message the driver), Needs you with their approval limit (bigger ones say they went to the admin), and driver messages.
+  - **Super admin overview** is the super admin's home screen. It has a dark platform bar with the amber chip, six totals, a companies table with filters, integrations and Needs your attention. Real data is used for this company, its vehicles, AI decisions and undos, AI cost, and the health of routing, weather and Claude. Company settings and dispatchers are shown read only. Everything made up is tagged "Sample data": the other 5 companies, monthly revenue, uptime and the trial reminder.
+  - **Driver Today + Delivery** is a new page at **`docs/driver-app.html`**.
+    - Today: driving time left with a break warning, the current job in an amber outline with Navigate and the one button that fits the job state, later stops, messages from dispatch, Report a problem and Start break, and LV / RU / EN.
+    - Delivery: photos, receiver name, a signature pad, "damaged or missing" with a note, and Delivered. Delivered needs a name and a signature.
+    - It works offline: actions are saved on the phone and sent when there is signal.
+    
+    Backend changes for it:
+    - a `break` driver action (45 min, only while driving or free)
+    - a delivery proof on `delivered` (receiver, signed, photo count, damage note), kept on the order and shown on the orders board
+    - damage raises an alert
+    - new tests in `tests/test_driver_app.py`
+
+**Not done / limits**
+- **`docs/driver.html` is not replaced yet.** Drivers are still sent to the old page. The new one hasn't been opened on a phone, and drivers depend on it, so I didn't swap it blind. To swap after testing: delete `docs/driver.html` and `docs/driver.js`/`driver.css`, rename `frontend/driver-app.html` to `driver.html` (and its input in `vite.config.ts`), then rebuild. The `test_auth` check for the old driver markup will need updating at the same time.
+- **Not shown because the backend has no data for them:**
+  - AI activity: "Redo", "Ask me first next time", and the "options compared" and "safety checks" sections. The "Why" section shows the team's log lines from just before the decision.
+  - Orders: "Send invoice" and customer names.
+  - Delivery: the photos stay on the phone. Only the number of photos is sent, because there is no file storage yet.
+- **Telegram is not connected.** "Driver messages" shows messages sent from the dashboard and problems reported on the driver page, and it says so.
+- "Connect a truck" shows a "not built yet" note. Real tracker onboarding doesn't exist.
+- The super admin's other nav sections (Companies, Users, Billing, AI usage, Integrations, Support) aren't separate screens. The overview covers them on one page.
+- I made two process slips, both fixed straight away: one `cd frontend` that changed directory, and one build that overwrote `docs/index.html` before the old page was saved. I restored it from git as `classic.html`.
+
+**Not verified**
+- **No browser was available, so nothing was clicked.** The checks were the TypeScript build, lint, and tests that read the built files and call the API the screens use. Layout, motion, dark mode and the signature pad have not been seen on a screen.
+
+**Owner should check**
+1. Start the app and open `/`. Sign in as each demo account and check which screen opens first:
+   - admin opens the map
+   - employee opens My shift
+   - super opens Overview
+   - guest opens the map, read only
+   
+   Then check light/dark, and the Lite mode switch.
+2. On the map: click a truck to open its sheet, Refuel/Charge from Needs you, approve something, ask the AI team with Ctrl K, and simulate an event from the flask menu.
+3. Fleet: filter, search with `/`, sort, Export CSV. AI activity: Undo an "Assigned J…" line and check the order goes back to New on the Orders board.
+4. Orders: New order → Assign the suggestion. Stop the backend to see the offline banner and the queued change, then start it again and check the change sends.
+5. **Driver page on a phone:** sign in as `driver` at `/driver-app.html`, then go through I've arrived → Loaded → Hand over → photos, name, signature → Delivered. Try it once in airplane mode. If it's good, tell me to swap it in for `driver.html`.
+6. `/classic.html` is the old dashboard, kept as a fallback. Delete it when you're happy with the new one.
+
+**Questions**
+1. May I replace `docs/driver.html` with the new driver page once you've tried it on a phone?
+2. Delivery photos: should they be uploaded and stored, and if so where? For example a disk on Render, or S3 / Cloudflare R2.
+3. Should "Ask me first next time" become a real setting? For example: turn this kind of AI decision (reroute, assign, service booking) into an approval for this company.
+4. Lite mode turns on for screens of 1440 px wide or less, which covers most laptops, exactly as DESIGN.md says. Is that what you want, or should the limit be lower (e.g. 1280)?
+5. Can I delete `docs/classic.html` and the old `docs/app.js`/`style.css` once the new dashboard is approved?
+
+**Push:** see the line below.
