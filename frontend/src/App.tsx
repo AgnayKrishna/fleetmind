@@ -27,11 +27,13 @@ import { GtmPage } from '@/pages/Gtm'
 import { ReportsPage } from '@/pages/Reports'
 import { FleetPage } from '@/pages/Fleet'
 import { ActivityPage } from '@/pages/Activity'
+import { ShiftPage } from '@/pages/Shift'
 
-const PAGES: Page[] = ['map', 'fleet', 'orders', 'activity', 'reports', 'gtm']
-const pageFromHash = (): Page => {
+const PAGES: Page[] = ['shift', 'map', 'fleet', 'orders', 'activity', 'reports', 'gtm']
+/** null = your home screen: My shift for dispatchers, the map for everyone else. */
+const pageFromHash = (): Page | null => {
   const p = location.hash.replace(/^#\/?/, '') as Page
-  return PAGES.includes(p) ? p : 'map'
+  return PAGES.includes(p) ? p : null
 }
 
 function errText(e: unknown) { return e instanceof Error ? e.message : String(e) }
@@ -56,7 +58,9 @@ export default function App() {
   const { theme, toggle } = useTheme()
   const feed = useFleet(!!user && user.role !== 'driver')
   const s = feed.state
-  const [page, setPageState] = useState<Page>(pageFromHash)
+  const [pageChoice, setPageState] = useState<Page | null>(pageFromHash)
+  const home: Page = user?.role === 'employee' ? 'shift' : 'map'
+  const page: Page = !pageChoice || (pageChoice === 'shift' && user?.role !== 'employee') ? home : pageChoice
   const [selected, setSelected] = useState<string | null>(null)
   const [focus, setFocus] = useState<MapFocus | null>(null)
   const [approvalId, setApprovalId] = useState<string | null>(null)
@@ -80,7 +84,7 @@ export default function App() {
   // ---- simple hash routing: #/fleet, #/orders, ... ----
   const setPage = useCallback((p: Page) => {
     setPageState(p)
-    history.replaceState(null, '', p === 'map' ? location.pathname + location.search : `#/${p}`)
+    history.replaceState(null, '', `${location.pathname}${location.search}#/${p}`)
   }, [])
   useEffect(() => {
     const on = () => setPageState(pageFromHash())
@@ -236,6 +240,10 @@ export default function App() {
           <main className="absolute inset-0 z-10 flex flex-col bg-background px-5 pb-5" style={{ paddingTop: panelTop }}>
             {page === 'gtm' && can.gtm(role) && <GtmPage />}
             {page === 'reports' && can.history(role) && <ReportsPage state={s} />}
+            {page === 'shift' && (
+              <ShiftPage state={s} log={feed.log} onSelectVehicle={selectVehicle} onReview={a => setApprovalId(a.id)}
+                onAttention={onAttention} onMessage={setMsgFor} />
+            )}
             {page === 'fleet' && <FleetPage state={s} log={feed.log} onSelect={selectVehicle} lastOk={feed.lastOk} />}
             {page === 'activity' && <ActivityPage state={s} log={feed.log} onSelectVehicle={selectVehicle} onUndo={undoAction} />}
             {page === 'orders' && (

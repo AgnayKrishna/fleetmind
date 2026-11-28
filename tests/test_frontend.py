@@ -79,6 +79,16 @@ def test_states_in_bundle_and_fields_they_read():
     assert all(v["route_source"] in (None, "tomtom", "here", "osrm", "fallback") for v in s["vehicles"])
 
 
+def test_dispatcher_shift_in_bundle_and_state():
+    _, js = bundle()
+    for needle in ("My shift", "My trucks", "Driver messages", "the company admin", "within your limit"):
+        assert needle in js, needle
+    c = TestClient(app)
+    c.post("/api/auth/login", json={"username": "employee", "password": "fleetmind-employee"})
+    me = c.get("/api/state").json()["me"]
+    assert me["role"] == "employee" and me["trucks"] and me["approval_limit_eur"] is not None and me["admin_name"]
+
+
 def test_lite_mode_in_bundle():
     _, js = bundle()
     for needle in ("Lite mode", "fmLite", "(max-width: 1440px), (max-height: 800px)", "prefers-reduced-transparency",

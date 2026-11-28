@@ -9,9 +9,10 @@ import type { FleetState, User } from '@/lib/types'
 import { Logo, Panel } from './fm'
 import { VehicleGlyph } from './VehicleSymbols'
 
-export type Page = 'map' | 'fleet' | 'orders' | 'activity' | 'reports' | 'gtm'
+export type Page = 'shift' | 'map' | 'fleet' | 'orders' | 'activity' | 'reports' | 'gtm'
 
 const NAV: { id: Page; label: string; show?: (u: User) => boolean }[] = [
+  { id: 'shift', label: 'My shift', show: u => u.role === 'employee' },
   { id: 'map', label: 'Map' }, { id: 'fleet', label: 'Fleet' }, { id: 'orders', label: 'Orders' },
   { id: 'activity', label: 'AI activity' }, { id: 'reports', label: 'Reports', show: u => can.history(u.role) },
   { id: 'gtm', label: 'GTM', show: u => can.gtm(u.role) },
@@ -110,6 +111,7 @@ export function TopBar({ state, user, page, onPage, onSelectVehicle, onAsk, onEv
         <Logo />
         <span className="text-[18px] font-extrabold tracking-[-0.3px]">FleetMind</span>
         {user.role === 'superadmin' && <span className="rounded-full bg-amber px-2.5 py-0.5 text-[12px] font-extrabold text-on-amber">Super admin</span>}
+        {user.role === 'employee' && <span className="hidden rounded-full bg-load-tint px-2.5 py-0.5 text-[12px] font-extrabold text-load-text 2xl:inline">Dispatcher</span>}
         {user.role === 'guest' && <span className="rounded-full bg-chip px-2.5 py-0.5 text-[12px] font-bold text-muted-ink">Guest · read only</span>}
       </div>
 
