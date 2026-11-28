@@ -16,6 +16,7 @@ Roles (design/reference/roles.reference.html is the source of truth):
                    their own assigned trucks, sees trip costs and savings. Never sees customer prices,
                    revenue, profit, billing, settings or GTM.
   driver           only the phone view of their own vehicle (/api/driver/...)
+  guest            public "View as guest": the company admin's view, read only, no write rule at all
 
 Rules that depend on the data (approval limit, own trucks) are checked in the endpoint itself.
 Every /api route must be listed in PERMISSIONS; anything not listed is refused (deny by default).
@@ -27,13 +28,17 @@ import secrets
 import threading
 import time
 
-ROLES = ("superadmin", "logistics_admin", "employee", "driver")
+ROLES = ("superadmin", "logistics_admin", "employee", "driver", "guest")
+# guest: "View as guest" on the login page. Sees what a company admin sees, changes nothing
+# (it is in no write rule below). Not a database user: the session is made on the fly.
 OPEN = None                                   # no login needed
 ANY = set(ROLES)
 ADMIN = {"logistics_admin"}
 OPS = {"superadmin", "logistics_admin"}          # admin + FleetMind support (read / platform things)
 DISPATCH = {"logistics_admin", "employee"}       # people who run the company's day
-STAFF = {"superadmin", "logistics_admin", "employee"}
+STAFF = {"superadmin", "logistics_admin", "employee", "guest"}       # can look at the company dashboard
+ADMIN_VIEW = {"logistics_admin", "guest"}        # see prices, revenue and profit
+GUEST_USER = {"username": "guest", "name": "Guest (read only)", "role": "guest", "vehicle_id": None}
 SUPER = {"superadmin"}
 DRIVER = {"driver"}
 
@@ -43,15 +48,16 @@ PERMISSIONS = [
     ("GET", r"/api/auth/demo-accounts", OPEN),
     ("POST", r"/api/auth/login", OPEN),
     ("POST", r"/api/auth/logout", OPEN),
+    ("POST", r"/api/auth/guest", OPEN),
     ("GET", r"/api/auth/me", ANY),
     ("POST", r"/api/gtm/open", OPEN),          # prospects from an outreach email have no login
     ("GET", r"/api/map/tile/[^/]+/\d+/\d+/\d+\.png", OPEN),   # map images can't send a bearer header
     ("GET", r"/api/state", STAFF),
     ("GET", r"/api/actions", STAFF),
-    ("GET", r"/api/history/[^/]+", OPS),
+    ("GET", r"/api/history/[^/]+", OPS | {"guest"}),
     ("GET", r"/api/gtm", SUPER),
     ("POST", r"/api/gtm/[^/]+/status", SUPER),
-    ("GET", r"/api/settings", OPS),            # superadmin: read only, for support
+    ("GET", r"/api/settings", OPS | {"guest"}),   # superadmin: read only, for support
     ("POST", r"/api/settings", ADMIN),
     ("GET", r"/api/users", OPS),
     ("POST", r"/api/users/[^/]+/trucks", ADMIN),
@@ -63,7 +69,7 @@ PERMISSIONS = [
     ("POST", r"/api/vehicles/[^/]+/message", DISPATCH),
     ("POST", r"/api/vehicles/[^/]+/energy_stop", DISPATCH),   # employee: own trucks only
     ("POST", r"/api/chat", DISPATCH),          # answers include trip costs, which the superadmin doesn't get
-    ("POST", r"/api/control", OPS),            # demo simulation speed, not a company decision
+    ("POST", r"/api/control", OPS),            # (guest is in no POST rule: read only)            # demo simulation speed, not a company decision
     ("GET", r"/api/driver/me", DRIVER),
     ("POST", r"/api/driver/action", DRIVER),
     ("POST", r"/api/driver/problem", DRIVER),
@@ -80,7 +86,9 @@ _COMPILED = [(m, re.compile(p + r"/?"), roles) for m, p, roles in PERMISSIONS]
 
 # Demo accounts, seeded into the database on first start and shown on the login page.
 DEMO_USERS = [
-    {"username": "super", "password": "fleetmind-super", "name": "Sam Superadmin", "role": "superadmin"},
+    # public=False: the account works but is not listed on the public login page
+    {"username": "super", "password": "fleetmind-super", "name": "Sam Superadmin", "role": "superadmin",
+     "public": False},
     {"username": "admin", "password": "fleetmind-admin", "name": "Alex Logistics", "role": "logistics_admin"},
     {"username": "employee", "password": "fleetmind-employee", "name": "Eva Dispatcher", "role": "employee"},
     {"username": "driver", "password": "fleetmind-driver", "name": "Driver of LV-T01", "role": "driver",

@@ -181,7 +181,10 @@ tr { cursor: pointer; } tr:hover td { background: var(--panel2); }
 /* ---------- sign-in and roles ---------- */
 /* sim-only: demo speed controls (superadmin + admin). admin-only: event triggers.
    write-only: things the people running the company do (admin + dispatcher). The backend checks again. */
-body[data-role="employee"] .sim-only, body[data-role="driver"] .sim-only { display: none !important; }
+body[data-role="employee"] .sim-only, body[data-role="driver"] .sim-only, body[data-role="guest"] .sim-only { display: none !important; }
+.guest-btn { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 10px;
+  min-height: 44px; font-weight: 600; font-size: 14px; }
+.guest-btn small { font-weight: 400; color: var(--muted); margin-left: 6px; }
 body:not([data-role="logistics_admin"]) .admin-only { display: none !important; }
 body:not([data-role="logistics_admin"]):not([data-role="employee"]) .write-only { display: none !important; }
 body:not([data-role="superadmin"]) .super-only { display: none !important; }

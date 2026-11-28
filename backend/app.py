@@ -94,7 +94,18 @@ class LoginIn(BaseModel):
 def demo_accounts():
     """Shown on the login page. Demo only: these passwords are public."""
     return {"accounts": [{k: u[k] for k in ("username", "password", "name", "role")} | {"vehicle_id": u.get("vehicle_id")}
-                         for u in auth.DEMO_USERS]}
+                         for u in auth.DEMO_USERS if u.get("public", True)],
+            "guest": True}
+
+
+@app.post("/api/auth/guest")
+def login_guest(request: Request):
+    """'View as guest': a read-only company admin view for the public demo. No password."""
+    token = sessions.create(auth.GUEST_USER)
+    r = JSONResponse({"ok": True, "token": token, "user": dict(auth.GUEST_USER)})
+    https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+    r.set_cookie(auth.COOKIE, token, max_age=auth.SESSION_TTL_S, httponly=True, samesite="lax", secure=https)
+    return r
 
 
 @app.post("/api/auth/login")
@@ -215,6 +226,8 @@ def can_decide(user, appr, limit):
         if (appr.get("cost_eur") or 0) <= limit:
             return True, None
         return False, f"Over your €{limit:g} limit: sent to {admin_name()} for approval."
+    if user["role"] == "guest":
+        return False, "Guest view is read only. Sign in to decide."
     return False, "Only the company decides its own approvals."
 
 
@@ -256,7 +269,7 @@ def state(request: Request, since: int = 0):
     for v in s["vehicles"]:
         v["mine"] = mine is None or v["id"] in mine
     s["actions"] = actions_for(user)[:60]
-    if role != "logistics_admin":          # customer prices, revenue and profit are for the company admin
+    if role not in auth.ADMIN_VIEW:        # customer prices, revenue and profit are for the company admin
         s["jobs"] = [{k: v for k, v in j.items() if k not in auth.PRICE_FIELDS} for j in s["jobs"]]
         for k in auth.REVENUE_KPIS:
             s["kpi"].pop(k, None)
@@ -413,7 +426,7 @@ def history(request: Request, what: str, limit: int = 100, status: str | None = 
         return JSONResponse({"ok": False, "error": "use orders, approvals or decisions"}, status_code=404)
     store.sync(world)
     rows = store.history(what, limit, status)
-    if what == "orders" and request.state.user["role"] != "logistics_admin":
+    if what == "orders" and request.state.user["role"] not in auth.ADMIN_VIEW:
         for r in rows:
             r["data"] = {k: v for k, v in (r.get("data") or {}).items() if k not in auth.PRICE_FIELDS}
     return {"ok": True, what: rows}

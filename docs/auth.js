@@ -7,7 +7,8 @@ const FM = (() => {
   const API = (params.get("api") || window.FLEET_API_URL || "").replace(/\/$/, "");
   let token = sessionStorage.getItem("fmToken") || "";
   let user = null, waiting = null;
-  const ROLE_LABEL = { superadmin: "Super admin", logistics_admin: "Company admin", employee: "Dispatcher", driver: "Driver" };
+  const ROLE_LABEL = { superadmin: "Super admin", logistics_admin: "Company admin", employee: "Dispatcher", driver: "Driver",
+    guest: "Read only" };
   const escH = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const headers = () => (token ? { Authorization: "Bearer " + token } : {});
 
@@ -47,13 +48,11 @@ const FM = (() => {
     document.getElementById("loginUser").focus();
     waiting = new Promise(resolve => {
       const form = document.getElementById("loginForm"), err = document.getElementById("loginErr");
-      form.onsubmit = async e => {
-        e.preventDefault();
+      const signIn = async (path, body) => {
         err.classList.add("hidden");
         try {
-          const r = await fetch(API + "/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username: document.getElementById("loginUser").value.trim(),
-                                   password: document.getElementById("loginPass").value }) });
+          const r = await fetch(API + path, { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body) });
           const d = await r.json();
           if (!r.ok) throw new Error(d.error || "Sign-in failed");
           token = d.token; sessionStorage.setItem("fmToken", token);
@@ -61,6 +60,14 @@ const FM = (() => {
           resolve(user);
         } catch (ex) { err.textContent = ex.message === "Failed to fetch" ? "Can't reach the backend." : ex.message; err.classList.remove("hidden"); }
       };
+      form.onsubmit = e => {
+        e.preventDefault();
+        signIn("/api/auth/login", { username: document.getElementById("loginUser").value.trim(),
+                                    password: document.getElementById("loginPass").value });
+      };
+      // "View as guest": read-only company view for the public demo, no password
+      const guest = document.getElementById("guestBtn");
+      if (guest) guest.onclick = () => signIn("/api/auth/guest", {});
     });
     return waiting;
   }
