@@ -143,7 +143,14 @@ function OrderCard({ j, col, state, canWrite, busy, suggestion, approval, onAssi
   } else if (v) {
     meta = { text: `${v.id} · ${v.driver.split(' ')[0]}${v.fuel_stop ? ', fuel or charge stop planned' : ''}${j.customer_notified ? ', customer told' : ''}`,
       tone: trip?.on_time === false ? 'watch' : 'plain' }
-  } else if (col === 'delivered' && j.vehicle) meta = { text: `${j.vehicle}`, tone: 'plain' }
+  } else if (col === 'delivered') {
+    const p = j.proof
+    meta = p ? {
+      text: [p.receiver ? `Received by ${p.receiver}` : 'Delivered', p.signed && 'signed', p.photos ? `${p.photos} photo${p.photos === 1 ? '' : 's'}` : '',
+        j.vehicle].filter(Boolean).join(', ') + (p.damaged ? `. Damage reported: ${p.note ?? 'no details'}` : ''),
+      tone: p.damaged ? 'act' : 'plain',
+    } : j.vehicle ? { text: j.vehicle, tone: 'plain' } : null
+  }
 
   const metaCls = { amber: 'text-amber-text', watch: 'text-watch-text', act: 'text-act-text', plain: 'text-[var(--fm-park-text)]' }
 

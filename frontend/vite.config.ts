@@ -30,6 +30,12 @@ export default defineConfig({
     assetsDir: 'assets',
     chunkSizeWarningLimit: 1600,  // maplibre-gl is about 1 MB on its own
     rollupOptions: {
+      // index.html = dashboard, driver-app.html = the new driver phone page (docs/driver.html stays
+      // as it is until the new one has been tried on a phone)
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        driver: fileURLToPath(new URL('./driver-app.html', import.meta.url)),
+      },
       output: { manualChunks: id => (id.includes('maplibre-gl') ? 'maplibre' : undefined) },
     },
   },

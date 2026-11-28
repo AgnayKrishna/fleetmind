@@ -18,13 +18,17 @@ from backend.app import app  # noqa: E402
 client = TestClient(app)
 
 
-def bundle():
-    html = client.get("/").text
-    scripts = re.findall(r'src="\./(assets/index-[^"]+\.js)"', html)
-    assert scripts, "docs/index.html should load the Vite bundle from ./assets"
-    r = client.get("/" + scripts[0])
-    assert r.status_code == 200
-    return html, r.text
+def bundle(page="/"):
+    """The page's HTML and all the JS it loads (entry + shared chunks), joined."""
+    html = client.get(page).text
+    scripts = re.findall(r'(?:src|href)="\./(assets/[^"]+\.js)"', html)
+    assert scripts, f"{page} should load the Vite bundle from ./assets"
+    js = []
+    for s in scripts:
+        r = client.get("/" + s)
+        assert r.status_code == 200, s
+        js.append(r.text)
+    return html, "\n".join(js)
 
 
 def test_root_serves_the_react_app():
@@ -100,6 +104,16 @@ def test_super_admin_overview_in_bundle_and_data():
     assert s["company"]["name"] and "auto_decisions" in s["kpi"] and isinstance(s["actions"], list)
     assert c.get("/api/settings").json()["ok"] and c.get("/api/users").json()["ok"]    # read only, for support
     assert c.post("/api/settings", json={"approval_limit_eur": 1}).status_code == 403
+
+
+def test_new_driver_page_in_bundle():
+    html, js = bundle("/driver-app.html")
+    assert '<div id="root">' in html and 'name="viewport"' in html and 'src="./config.js"' in html
+    assert "maplibre" not in html                                   # the phone page doesn't load the map library
+    for needle in ("/api/driver/me", "/api/driver/action", "/api/driver/problem", "fmDriverQueue", "Hand over the load",
+                   "Nodot kravu", "Сдать груз", "Start break", "Something is damaged or missing", "Works offline",
+                   "google.com/maps/dir"):
+        assert needle in js, needle
 
 
 def test_lite_mode_in_bundle():

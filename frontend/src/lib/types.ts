@@ -94,6 +94,7 @@ export interface Job {
   hold?: boolean
   price_eur?: number
   created_by?: string
+  proof?: { receiver: string | null; signed: boolean; photos: number; damaged: boolean; note: string | null }
 }
 
 export interface ApprovalOption { id: string; label: string; detail?: string; cost_eur?: number }
