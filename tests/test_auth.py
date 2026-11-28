@@ -160,7 +160,7 @@ def test_driver_buttons_follow_the_job():
 
 def test_pages_have_login_and_driver_layout():
     c = client_for()
-    html = c.get("/").text
+    html = c.get("/classic.html").text
     assert 'id="login"' in html and 'src="auth.js"' in html and "admin-only" in html and "write-only" in html
     d = c.get("/driver.html").text
     for needle in ('data-action="arrived"', 'data-action="loaded"', 'data-action="delivered"', 'id="dReport"',

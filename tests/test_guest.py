@@ -95,5 +95,5 @@ def test_demo_key_still_locks_writes(monkeypatch):
 
 
 def test_login_page_has_guest_button():
-    html = TestClient(app).get("/").text
+    html = TestClient(app).get("/classic.html").text
     assert 'id="guestBtn"' in html and "View as guest" in html

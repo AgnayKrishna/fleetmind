@@ -2,7 +2,9 @@
 // TomTom live traffic on top when the server has a key (through the /api/map/tile proxy),
 // vehicles as the soft 3D truck / van symbols that rotate to their heading and glide between updates.
 import { useEffect, useRef } from 'react'
-import maplibregl, { type GeoJSONSource, type StyleSpecification } from 'maplibre-gl'
+import * as maplibregl from 'maplibre-gl'
+import type { FilterSpecification, GeoJSONSource, StyleSpecification } from 'maplibre-gl'
+import type { FeatureCollection } from 'geojson'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { STATUS, isMoving, isTruck, statusOf, VEHICLE_COLOR } from '@/lib/fleet'
 import { tileUrl } from '@/lib/api'
@@ -18,7 +20,7 @@ const TOKENS = {
 
 function baseStyle(theme: Theme): StyleSpecification {
   const t = TOKENS[theme]
-  const roads = (classes: string[]) => ['match', ['get', 'class'], classes, true, false] as unknown as maplibregl.FilterSpecification
+  const roads = (classes: string[]) => ['match', ['get', 'class'], classes, true, false] as unknown as FilterSpecification
   return {
     version: 8,
     glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
@@ -133,7 +135,7 @@ export function FleetMap({ state, theme, lite, selected, onSelect, focus, bottom
     m.touchZoomRotate.disableRotation()
     m.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right')
     m.on('style.load', () => { addOverlays(m); ready.current = true; drawData() })
-    m.on('click', e => {
+    m.on('click', (e: { originalEvent: MouseEvent }) => {
       const hit = (e.originalEvent.target as HTMLElement | null)?.closest?.('.fm-veh')
       if (!hit) latest.current.onSelect(null)
     })
@@ -164,7 +166,7 @@ export function FleetMap({ state, theme, lite, selected, onSelect, focus, bottom
 
   function addOverlays(m: maplibregl.Map) {
     const t = TOKENS[document.documentElement.classList.contains('dark') ? 'dark' : 'light']
-    const empty = { type: 'FeatureCollection', features: [] } as GeoJSON.FeatureCollection
+    const empty = { type: 'FeatureCollection', features: [] } as FeatureCollection
     m.addSource('zones', { type: 'geojson', data: empty })
     m.addLayer({ id: 'zones-fill', type: 'fill', source: 'zones', paint: { 'fill-color': t.act, 'fill-opacity': 0.1 } })
     m.addLayer({ id: 'zones-line', type: 'line', source: 'zones',

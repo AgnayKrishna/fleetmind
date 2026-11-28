@@ -41,7 +41,7 @@ def test_breakdown_shows_up_as_approval_or_broken_vehicle():
 
 
 def test_dashboard_has_attention_bar():
-    html = client.get("/").text
+    html = client.get("/classic.html").text        # the old dashboard, kept while the React one settles in
     assert 'id="attn"' in html and 'id="attnList"' in html
 
 
